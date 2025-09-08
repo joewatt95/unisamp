@@ -1,0 +1,12 @@
+{
+  "name": "cadiback",
+  "version-string": "0.2.1",
+  "homepage": "https://github.com/meelgroup/cadiback",
+  "description": "CDCL satisfiability backbone extractor",
+  "dependencies": [
+    {
+      "name": "cadical",
+      "version>=": "2.0.0"
+    }
+  ]
+}

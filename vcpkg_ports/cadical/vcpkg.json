@@ -1,0 +1,9 @@
+{
+  "name": "cadical",
+  "version-string": "2.0.0",
+  "homepage": "https://github.com/meelgroup/cadical",
+  "description": "Simple CDCL satisfiability solver",
+  "dependencies": [
+    "vcpkg-make"
+  ]
+}

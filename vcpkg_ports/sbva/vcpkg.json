@@ -1,0 +1,9 @@
+{
+  "name": "sbva",
+  "version-string": "0.0.1",
+  "homepage": "https://github.com/meelgroup/sbva",
+  "description": "Tool for reducing SAT formulas using structured bounded variable additio",
+  "dependencies": [
+    "vcpkg-cmake"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "approxmc",
+  "version-string": "4.2.0",
+  "homepage": "https://github.com/meelgroup/approxmc",
+  "description": "Approximate Model Counter",
+  "dependencies": [
+    {
+      "name": "arjun",
+      "version>=": "2.6.1"
+    }
+  ]
+}

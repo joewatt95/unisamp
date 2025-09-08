@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-include_directories( ${PROJECT_SOURCE_DIR})
+include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${CRYPTOMINISAT5_INCLUDE_DIRS})
@@ -71,7 +71,7 @@ set_target_properties(unigen PROPERTIES
 add_executable(unigen-bin main.cpp)
 set(unigen_exec_link_libs "unigen")
 IF (ZLIB_FOUND)
-    SET(unigen_exec_link_libs ${unigen_exec_link_libs} ${ZLIB_LIBRARY})
+    set(unigen_exec_link_libs ${unigen_exec_link_libs} ${ZLIB_LIBRARY})
 ENDIF()
 target_link_libraries(unigen-bin ${unigen_exec_link_libs})
 

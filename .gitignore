@@ -1,3 +1,5 @@
+vcpkg_installed/
+
 build/
 .kdev4/
 scalmc.kdev4
