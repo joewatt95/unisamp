@@ -25,19 +25,19 @@ message(STATUS "LIB directory is '${CMAKE_INSTALL_LIBDIR}'")
 message(STATUS "BIN directory is '${CMAKE_INSTALL_BINDIR}'")
 
 if(POLICY CMP0022)
-    cmake_policy(set CMP0022 NEW)
+  cmake_policy(SET CMP0022 NEW)
 endif()
 
 if(POLICY CMP0048)
-    cmake_policy(set CMP0048 NEW)
+  cmake_policy(SET CMP0048 NEW)
 endif()
 
 if(POLICY CMP0046)
-    cmake_policy(set CMP0046 NEW)
+  cmake_policy(SET CMP0046 NEW)
 endif()
 
 if(POLICY CMP0026)
-    cmake_policy(set CMP0026 NEW)
+  cmake_policy(SET CMP0026 NEW)
 endif()
 
 # -----------------------------------------------------------------------------
@@ -76,13 +76,6 @@ foreach (build_config ${build_types})
 endforeach()
 
 project(unigen)
-
-# find_package(gmp REQUIRED)
-# find_package(zlib REQUIRED)
-# find_package(mpfr REQUIRED)
-# find_package(cereal REQUIRED)
-# find_package(ensmallen REQUIRED)
-# find_package(mlpack REQUIRED)
 
 add_executable(unigen main.cpp)
 target_link_libraries(unigen PRIVATE gmp zlib mpfr cereal armadillo ensmallen mlpack)

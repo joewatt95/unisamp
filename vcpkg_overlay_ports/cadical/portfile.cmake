@@ -4,8 +4,6 @@ vcpkg_from_github(
   REF 19b73b36ab9a0be427985abfb599be2da454225c
   SHA512 88b70b56f6785a15f79becc145794506d9784a16bc219cc2b4e821846e57e040bf0ed68a7f2ad82ca051f25b84dbd109536829dad89855789b0775095a734f24
   HEAD_REF add_dynamic_lib
-  # PATCHES
-      # ... patches ...
 )
 
 set(VCPKG_C_FLAGS "${VCPKG_C_FLAGS} -fPIC")

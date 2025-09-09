@@ -3,7 +3,6 @@
   "version-string": "0.0.1",
   "dependencies": [
     "vcpkg-cmake",
-    "vcpkg-make",
     {
       "name": "approxmc",
       "version>=": "4.2.0"
