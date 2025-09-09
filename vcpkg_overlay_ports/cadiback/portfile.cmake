@@ -8,11 +8,9 @@ vcpkg_from_github(
     changes.patch
 )
 
+set(ENV{CADICAL_INSTALL_DIR} ${CURRENT_INSTALLED_DIR})
 set(ENV{CADICAL_VERSION} "2.0.0")
 set(ENV{CADICAL_GITID} "19b73b36ab9a0be427985abfb599be2da454225c")
-set(ENV{CADICAL_DIR} "${CURRENT_BUILDTREES_DIR}/../cadical/${TARGET_TRIPLET}-rel")
-
-# message(STATUS $ENV{CADICAL_DIR})
 
 # file(
 #   INSTALL "${CURRENT_PACKAGES_DIR}/lib/libcadical.a"

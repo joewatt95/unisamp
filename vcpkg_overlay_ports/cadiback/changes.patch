@@ -1,43 +1,42 @@
 diff --git a/configure b/configure
-index f8f1457..29834b0 100755
+index f8f1457..17f2106 100755
 --- a/configure
 +++ b/configure
-@@ -34,16 +34,14 @@ checkfile () {
+@@ -34,16 +34,13 @@ checkfile () {
    [ -f "$1" ] || die "could not find '$1'"
  }
  
 -[ x"$CADICAL" = x ] && CADICAL="../cadical"
-+checkdir "$CADICAL_DIR"
-+cadicalversion="$(cat "$CADICAL_DIR"/VERSION)"
++checkdir "$CADICAL_INSTALL_DIR"
  
 -checkdir "$CADICAL"
 -cadicalversion="`cat $CADICAL/VERSION`"
-+checkdir "$CADICAL_DIR/src"
-+checkdir "$CADICAL_DIR/build"
++checkdir "$CADICAL_INSTALL_DIR/include"
++checkdir "$CADICAL_INSTALL_DIR/lib"
  
 -checkdir "$CADICAL/src"
 -checkdir "$CADICAL/build"
 -
 -checkfile "$CADICAL/src/cadical.hpp"
 -checkfile "$CADICAL/build/libcadical.a"
-+checkfile "$CADICAL_DIR/src/cadical.hpp"
-+checkfile "$CADICAL_DIR/build/libcadical.a"
++checkfile "$CADICAL_INSTALL_DIR/include/cadical.hpp"
++checkfile "$CADICAL_INSTALL_DIR/lib/libcadical.a"
  
  while [ $# -gt 0 ]
  do
-@@ -56,9 +54,9 @@ do
+@@ -56,9 +53,9 @@ do
    shift
  done
  
 -msg "Using CADICAL='$CADICAL' version '$cadicalversion'"
-+msg "Using CADICAL='$CADICAL_DIR' version '$cadicalversion'"
++msg "Using CADICAL='$CADICAL_INSTALL_DIR'"
  
 -if [ x"`grep 'bool flip' $CADICAL/src/cadical.hpp`" = x ]
-+if [ "$(grep 'bool flip' "$CADICAL_DIR"/src/cadical.hpp)" = "" ]
++if [ "$(grep 'bool flip' "$CADICAL_INSTALL_DIR"/include/cadical.hpp)" = "" ]
  then
    [ $flip = no ] || \
      die "no 'CaDiCaL' support for 'bool flip (int lit)' (update version or use '--no-flip')"
-@@ -68,14 +66,14 @@ else
+@@ -68,14 +65,14 @@ else
    flip=yes
  fi
  
@@ -54,7 +53,7 @@ index f8f1457..29834b0 100755
  then
    LINK="ar"
  else
-@@ -94,6 +92,6 @@ fi
+@@ -94,6 +91,6 @@ fi
  msg "Compiling with '$COMPILE'"
  
  rm -f makefile
@@ -87,7 +86,7 @@ index 4d0d0bb..fc4ab93 100755
 +#define BUILD "$(sed '/^COMPILE/!d;s,^COMPILE=,,;s, -I.*,,' makefile)"
  EOF
 diff --git a/makefile.in b/makefile.in
-index 5152cf9..292ee60 100644
+index 5152cf9..4cbc911 100644
 --- a/makefile.in
 +++ b/makefile.in
 @@ -1,12 +1,12 @@
@@ -95,16 +94,16 @@ index 5152cf9..292ee60 100644
  LINK=@LINK@
  all: libcadiback.a libcadiback.so
 -libcadiback.a: cadiback.o ../cadical/build/libcadical.a makefile
-+libcadiback.a: cadiback.o ${CADICAL_DIR}/build/libcadical.a makefile
++libcadiback.a: cadiback.o ${CADICAL_INSTALL_DIR}/lib/libcadical.a makefile
  	$(LINK) rcs $@ cadiback.o
 -libcadiback.so: cadiback.o ../cadical/build/libcadical.so makefile
 -	$(COMPILE) -shared -o $@ -L../cadical/build/ -lcadical cadiback.o
 -cadiback.o: cadiback.cpp config.hpp ../cadical/src/cadical.hpp makefile
 -	$(COMPILE) -c $< -I../cadical/src
-+libcadiback.so: cadiback.o ${CADICAL_DIR}/build/libcadical.so makefile
-+	$(COMPILE) -shared -o $@ -L${CADICAL_DIR}/build/ -lcadical cadiback.o
-+cadiback.o: cadiback.cpp config.hpp ${CADICAL_DIR}/src/cadical.hpp makefile
-+	$(COMPILE) -c $< -I${CADICAL_DIR}/src
++libcadiback.so: cadiback.o ${CADICAL_INSTALL_DIR}/lib/libcadical.so makefile
++	$(COMPILE) -shared -o $@ -L${CADICAL_INSTALL_DIR}/lib/ -lcadical cadiback.o
++cadiback.o: cadiback.cpp config.hpp ${CADICAL_INSTALL_DIR}/include/cadical.hpp makefile
++	$(COMPILE) -c $< -I${CADICAL_INSTALL_DIR}/include
  config.hpp: generate VERSION makefile
  	./generate > $@
  clean:

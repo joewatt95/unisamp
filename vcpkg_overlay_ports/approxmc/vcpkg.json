@@ -4,9 +4,7 @@
   "homepage": "https://github.com/meelgroup/approxmc",
   "description": "Approximate Model Counter",
   "dependencies": [
-    {
-      "name": "arjun",
-      "version>=": "2.6.1"
-    }
+   "vcpkg-cmake",
+   "arjun"
   ]
 }
