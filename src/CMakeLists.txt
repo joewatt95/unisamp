@@ -20,11 +20,11 @@
 
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-include_directories(${Boost_INCLUDE_DIRS})
-include_directories(${CRYPTOMINISAT5_INCLUDE_DIRS})
-include_directories(${APPROXMC_INCLUDE_DIRS})
-include_directories(${GMP_INCLUDE_DIRS})
-include_directories(${ARJUN_INCLUDE_DIRS})
+# include_directories(${Boost_INCLUDE_DIRS})
+# include_directories(${CRYPTOMINISAT5_INCLUDE_DIRS})
+# include_directories(${APPROXMC_INCLUDE_DIRS})
+# include_directories(${GMP_INCLUDE_DIRS})
+# include_directories(${ARJUN_INCLUDE_DIRS})
 
 if (NOT WIN32)
     add_cxx_flag_if_supported("-Wno-bitfield-constant-conversion")
@@ -45,14 +45,14 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/GitSHA1.cpp.in"
     "${CMAKE_CURRENT_BINARY_DIR}/GitSHA1.cpp" @ONLY)
 
 set(unigen_lib_files
-    sampler.cpp
-    unigen.cpp
-    ${CMAKE_CURRENT_BINARY_DIR}/GitSHA1.cpp
+  sampler.cpp
+  unigen.cpp
+  ${CMAKE_CURRENT_BINARY_DIR}/GitSHA1.cpp
 )
 
-add_library(unigen ${unigen_lib_files})
+add_library(unigen_lib ${unigen_lib_files})
 
-target_link_libraries(unigen
+target_link_libraries(unigen_lib
     LINK_PUBLIC ${CRYPTOMINISAT5_LIBRARIES}
     LINK_PUBLIC ${ARJUN_LIBRARIES}
     LINK_PUBLIC ${APPROXMC_LIBRARIES}
@@ -60,7 +60,7 @@ target_link_libraries(unigen
     LINK_PUBLIC ${GMP_LIBRARY}
 )
 
-set_target_properties(unigen PROPERTIES
+set_target_properties(unigen_lib PROPERTIES
   PUBLIC_HEADER "${unigen_public_headers}"
   VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
   SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
@@ -68,23 +68,23 @@ set_target_properties(unigen PROPERTIES
   INSTALL_RPATH_USE_LINK_PATH TRUE
 )
 
-add_executable(unigen-bin main.cpp)
-set(unigen_exec_link_libs "unigen")
+add_executable(unigen_cli main.cpp)
+set(unigen_exec_link_libs "unigen_lib")
 IF (ZLIB_FOUND)
     set(unigen_exec_link_libs ${unigen_exec_link_libs} ${ZLIB_LIBRARY})
 ENDIF()
-target_link_libraries(unigen-bin ${unigen_exec_link_libs})
+target_link_libraries(unigen_cli ${unigen_exec_link_libs})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    set_target_properties(unigen-bin PROPERTIES
-      OUTPUT_NAME unigen
+    set_target_properties(unigen_cli PROPERTIES
+      # OUTPUT_NAME unigen
       RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}
       INSTALL_RPATH_USE_LINK_PATH TRUE
       LINK_FLAGS "-s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='[\"callMain\", \"ccall\", \"cwrap\", \"FS\", \"print\"]' -s FORCE_FILESYSTEM=1"
     )
 else()
-    set_target_properties(unigen-bin PROPERTIES
-      OUTPUT_NAME unigen
+    set_target_properties(unigen_cli PROPERTIES
+      # OUTPUT_NAME unigen
       RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}
       INSTALL_RPATH_USE_LINK_PATH TRUE
     )
@@ -109,7 +109,7 @@ foreach(public_header ${unigen_public_headers})
     )
 endforeach()
 
-install(TARGETS unigen
+install(TARGETS unigen_lib
     EXPORT ${UNIGEN_EXPORT_NAME}
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -117,7 +117,7 @@ install(TARGETS unigen
     PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/unigen"
 )
 
-install(TARGETS unigen-bin
+install(TARGETS unigen_cli
     EXPORT ${UNIGEN_EXPORT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

@@ -75,8 +75,25 @@ endforeach()
 
 project(unigen)
 
-add_executable(unigen main.cpp)
-target_link_libraries(unigen PRIVATE gmp zlib mpfr cereal armadillo ensmallen mlpack)
+include_directories(${PROJECT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
+add_executable(unigen
+  ${PROJECT_SOURCE_DIR}/src/main.cpp
+  ${PROJECT_SOURCE_DIR}/src/sampler.cpp
+  ${PROJECT_SOURCE_DIR}/src/unigen.cpp
+  ${CMAKE_CURRENT_BINARY_DIR}/src-unigen/GitSHA1.cpp
+)
+# target_link_libraries(unigen PRIVATE gmp zlib mpfr cereal armadillo ensmallen mlpack)
+
+# find_package(ZLIB REQUIRED)
+# find_package(cryptominisat5 CONFIG REQUIRED)
+# find_package(approxmc CONFIG REQUIRED)
+# find_package(arjun CONFIG REQUIRED)
+
+target_link_libraries(unigen PRIVATE
+  ZLIB::ZLIB cryptominisat5 approxmc arjun
+)
 
 enable_language(CXX)
 set(CMAKE_CXX_EXTENSIONS OFF)
