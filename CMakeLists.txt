@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-include(vcpkg)
+include($ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake)
 
 cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
 message(STATUS "LIB directory is '${CMAKE_INSTALL_LIBDIR}'")

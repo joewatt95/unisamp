@@ -4,6 +4,7 @@
   "homepage": "https://github.com/meelgroup/cadiback",
   "description": "CDCL satisfiability backbone extractor",
   "dependencies": [
+    "vcpkg-make",
     {
       "name": "cadical",
       "version>=": "2.0.0"

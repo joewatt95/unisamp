@@ -1,0 +1,66 @@
+vcpkg_from_github(
+  OUT_SOURCE_PATH SOURCE_PATH
+  REPO meelgroup/cadical
+  REF 19b73b36ab9a0be427985abfb599be2da454225c
+  SHA512 88b70b56f6785a15f79becc145794506d9784a16bc219cc2b4e821846e57e040bf0ed68a7f2ad82ca051f25b84dbd109536829dad89855789b0775095a734f24
+  HEAD_REF add_dynamic_lib
+  # PATCHES
+      # ... patches ...
+)
+
+set(VCPKG_C_FLAGS "${VCPKG_C_FLAGS} -fPIC")
+set(VCPKG_CXX_FLAGS "${VCPKG_CXX_FLAGS} -fPIC")
+
+vcpkg_make_configure(
+  SOURCE_PATH "${SOURCE_PATH}"
+  COPY_SOURCE
+  DISABLE_DEFAULT_OPTIONS
+  OPTIONS
+    --competition
+)
+
+vcpkg_execute_required_process(
+  COMMAND make
+  WORKING_DIRECTORY "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel"
+  LOGNAME "build-${TARGET_TRIPLET}-rel"
+)
+
+# vcpkg_make_install(
+#   MAKEFILE "makefile.in"
+#   TARGETS "all"
+# )
+
+file(
+  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/build/libcadical.a"
+  DESTINATION "${CURRENT_PACKAGES_DIR}/lib"
+)
+file(
+  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/build/libcadical.a"
+  DESTINATION "${CURRENT_PACKAGES_DIR}/debug/lib"
+)
+
+file(
+  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/build/libcadical.so"
+  DESTINATION "${CURRENT_PACKAGES_DIR}/lib"
+)
+file(
+  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/build/libcadical.so"
+  DESTINATION "${CURRENT_PACKAGES_DIR}/debug/lib"
+)
+
+file(GLOB CADICAL_HEADERS "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/src/*.hpp")
+file(
+  INSTALL ${CADICAL_HEADERS}
+  DESTINATION "${CURRENT_PACKAGES_DIR}/include"
+)
+file(
+  INSTALL ${CADICAL_HEADERS}
+  DESTINATION "${CURRENT_PACKAGES_DIR}/debug/include"
+)
+
+# file(
+#   INSTALL ${CADICAL_HEADERS}
+#   DESTINATION "${CURRENT_PACKAGES_DIR}${PATH_SUFFIX_DEBUG}/../include"
+# )
+
+vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/LICENSE")
