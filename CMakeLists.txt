@@ -18,9 +18,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
-message(STATUS "LIB directory is '${CMAKE_INSTALL_LIBDIR}'")
-message(STATUS "BIN directory is '${CMAKE_INSTALL_BINDIR}'")
+cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
+# message(STATUS "LIB directory is '${CMAKE_INSTALL_LIBDIR}'")
+# message(STATUS "BIN directory is '${CMAKE_INSTALL_BINDIR}'")
 
 if(POLICY CMP0022)
   cmake_policy(SET CMP0022 NEW)

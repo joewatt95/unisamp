@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
+
 vcpkg_from_github(
   OUT_SOURCE_PATH SOURCE_PATH
   REPO meelgroup/cadical
