@@ -29,6 +29,6 @@ const char* get_version_sha1();
 const char* get_version_tag();
 const char* get_compilation_env();
 
-}
+}  // namespace UnigenIntNS
 
-#endif //GITSHA1_H
+#endif  // GITSHA1_H

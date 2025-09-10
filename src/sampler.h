@@ -28,153 +28,130 @@ Sampler
 
 #pragma once
 
-#include <random>
-#include <map>
-#include <cstdint>
-#include <cryptominisat5/cryptominisat.h>
 #include <approxmc/approxmc.h>
-#include "unigen.h"
-#include "config.h"
+#include <cryptominisat5/cryptominisat.h>
 
-using std::string;
-using std::vector;
-using std::map;
+#include <cstdint>
+#include <map>
+#include <random>
+
+#include "config.h"
+#include "unigen.h"
+
+using ApproxMC::SolCount;
 using std::cout;
 using std::endl;
-using ApproxMC::SolCount;
+using std::map;
+using std::string;
+using std::vector;
 using namespace CMSat;
 using namespace ApproxMC;
 
 struct SavedModel {
-    SavedModel(uint32_t _hash_num, const vector<lbool>& _model) :
-        model(_model),
-        hash_num(_hash_num)
-    {
-    }
+  SavedModel(uint32_t _hash_num, const vector<lbool>& _model)
+      : model(_model), hash_num(_hash_num) {}
 
-    vector<lbool> model;
-    uint32_t hash_num;
+  vector<lbool> model;
+  uint32_t hash_num;
 };
 
 struct Hash {
-    Hash(uint32_t _act_var, vector<uint32_t>& _hash_vars, bool _rhs) :
-        act_var(_act_var),
-        hash_vars(_hash_vars),
-        rhs(_rhs)
-    {}
+  Hash(uint32_t _act_var, vector<uint32_t>& _hash_vars, bool _rhs)
+      : act_var(_act_var), hash_vars(_hash_vars), rhs(_rhs) {}
 
-    Hash()
-    {}
+  Hash() {}
 
-    uint32_t act_var;
-    vector<uint32_t> hash_vars;
-    bool rhs;
+  uint32_t act_var;
+  vector<uint32_t> hash_vars;
+  bool rhs;
 };
 
 struct HashesModels {
-    map<uint64_t, Hash> hashes;
-    vector<SavedModel> glob_model; //global table storing models
+  map<uint64_t, Hash> hashes;
+  vector<SavedModel> glob_model;  // global table storing models
 };
 
 struct SolNum {
-    SolNum(uint64_t _solutions, uint64_t _repeated) :
-        solutions(_solutions),
-        repeated(_repeated)
-    {}
-    uint64_t solutions = 0;
-    uint64_t repeated = 0;
+  SolNum(uint64_t _solutions, uint64_t _repeated)
+      : solutions(_solutions), repeated(_repeated) {}
+  uint64_t solutions = 0;
+  uint64_t repeated = 0;
 };
 
 struct SparseData {
-    explicit SparseData(int _table_no) :
-        table_no(_table_no)
-    {}
+  explicit SparseData(int _table_no) : table_no(_table_no) {}
 
-    uint32_t next_index = 0;
-    double sparseprob = 0.5;
-    int table_no = -1;
+  uint32_t next_index = 0;
+  double sparseprob = 0.5;
+  int table_no = -1;
 };
 
 class Sampler {
-public:
-    void sample(
-        const Config conf,
-        const SolCount sol_count,
-        const uint32_t num_samples);
-    AppMC* appmc;
-    SATSolver* solver = NULL;
+ public:
+  void sample(const Config conf, const SolCount sol_count,
+              const uint32_t num_samples);
+  AppMC* appmc;
+  SATSolver* solver = NULL;
 
-    ///What to call on samples
-    UniGen::callback callback_func = NULL;
-    void* callback_func_data = NULL;
+  /// What to call on samples
+  UniGen::callback callback_func = NULL;
+  void* callback_func_data = NULL;
 
-private:
-    uint32_t startiter;
-    uint32_t loThresh;
-    uint32_t hiThresh;
-    uint32_t thresh_sampler_gen;
+ private:
+  uint32_t startiter;
+  uint32_t loThresh;
+  uint32_t hiThresh;
+  uint32_t thresh_sampler_gen;
 
-    Config conf;
-    string gen_rnd_bits(const uint32_t size,
-                        const uint32_t numhashes);
-    uint32_t sols_to_return(uint32_t numSolutions);
-    void add_Sampler_options();
-    bool gen_rhs();
-    uint32_t gen_n_samples(
-        const uint32_t samples
-        , uint32_t* lastSuccessfulHashOffset
-        , const uint32_t num_samples_needed
-    );
-    Hash add_hash(uint32_t total_num_hashes);
-    string binary(const uint32_t x, const uint32_t length);
-    void generate_samples(const uint32_t num_samples);
-    SolNum bounded_sol_count(
-        uint32_t maxSolutions,
-        const vector<Lit>* assumps,
-        const uint32_t hashCount,
-        uint32_t minSolutions = 1,
-        HashesModels* hm = NULL,
-        vector<vector<int>>* out_solutions = NULL
-    );
-    vector<Lit> set_num_hashes(
-        uint32_t num_wanted,
-        map<uint64_t, Hash>& hashes
-    );
-    void simplify();
+  Config conf;
+  string gen_rnd_bits(const uint32_t size, const uint32_t numhashes);
+  uint32_t sols_to_return(uint32_t numSolutions);
+  void add_Sampler_options();
+  bool gen_rhs();
+  uint32_t gen_n_samples(const uint32_t samples,
+                         uint32_t* lastSuccessfulHashOffset,
+                         const uint32_t num_samples_needed);
+  Hash add_hash(uint32_t total_num_hashes);
+  string binary(const uint32_t x, const uint32_t length);
+  void generate_samples(const uint32_t num_samples);
+  SolNum bounded_sol_count(uint32_t maxSolutions, const vector<Lit>* assumps,
+                           const uint32_t hashCount, uint32_t minSolutions = 1,
+                           HashesModels* hm = NULL,
+                           vector<vector<int>>* out_solutions = NULL);
+  vector<Lit> set_num_hashes(uint32_t num_wanted, map<uint64_t, Hash>& hashes);
+  void simplify();
 
-    ////////////////
-    //Helper functions
-    ////////////////
-    void print_xor(const vector<uint32_t>& vars, const uint32_t rhs);
-    vector<int> get_solution_ints(const vector<lbool>& model);
-    void ban_one(const uint32_t act_var, const vector<lbool>& model);
-    void check_model(
-        const vector<lbool>& model,
-        const HashesModels* const hm,
-        const uint32_t hashCount
-    );
-    bool check_model_against_hash(const Hash& h, const vector<lbool>& model);
-    uint64_t add_glob_banning_cls(
-        const HashesModels* glob_model = NULL
-        , const uint32_t act_var = std::numeric_limits<uint32_t>::max()
-        , const uint32_t num_hashes = std::numeric_limits<uint32_t>::max()
-    );
+  ////////////////
+  // Helper functions
+  ////////////////
+  void print_xor(const vector<uint32_t>& vars, const uint32_t rhs);
+  vector<int> get_solution_ints(const vector<lbool>& model);
+  void ban_one(const uint32_t act_var, const vector<lbool>& model);
+  void check_model(const vector<lbool>& model, const HashesModels* const hm,
+                   const uint32_t hashCount);
+  bool check_model_against_hash(const Hash& h, const vector<lbool>& model);
+  uint64_t add_glob_banning_cls(
+      const HashesModels* glob_model = NULL,
+      const uint32_t act_var = std::numeric_limits<uint32_t>::max(),
+      const uint32_t num_hashes = std::numeric_limits<uint32_t>::max());
 
-    void readInAFile(SATSolver* solver2, const string& filename);
-    void readInStandardInput(SATSolver* solver2);
+  void readInAFile(SATSolver* solver2, const string& filename);
+  void readInStandardInput(SATSolver* solver2);
 
-    //Data so we can output temporary count when catching the signal
-    vector<uint64_t> numHashList;
-    vector<int64_t> numCountList;
-    template<class T> T findMedian(vector<T>& numList);
-    template<class T> T findMin(vector<T>& numList);
+  // Data so we can output temporary count when catching the signal
+  vector<uint64_t> numHashList;
+  vector<int64_t> numCountList;
+  template <class T>
+  T findMedian(vector<T>& numList);
+  template <class T>
+  T findMin(vector<T>& numList);
 
-    ////////////////
-    // internal data
-    ////////////////
-    double startTime;
-    std::mt19937 randomEngine;
-    uint32_t orig_num_vars;
-    double total_inter_simp_time = 0;
-    uint32_t threshold; //precision, it's computed
+  ////////////////
+  // internal data
+  ////////////////
+  double startTime;
+  std::mt19937 randomEngine;
+  uint32_t orig_num_vars;
+  double total_inter_simp_time = 0;
+  uint32_t threshold;  // precision, it's computed
 };

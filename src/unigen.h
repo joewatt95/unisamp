@@ -28,20 +28,22 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <vector>
-#include <functional>
 #include <cryptominisat5/cryptominisat.h>
 
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <vector>
+
 namespace ApproxMC {
-    class AppMC;
-    class SolCount;
-}
+class AppMC;
+class SolCount;
+}  // namespace ApproxMC
 
 namespace UniGen {
 
-typedef std::function<void(const std::vector<int>& solution, void* data)> callback;
+typedef std::function<void(const std::vector<int>& solution, void* data)>
+    callback;
 
 struct UniGenPrivateData;
 #ifdef _WIN32
@@ -50,40 +52,38 @@ class __declspec(dllexport) UniG
 class UniG
 #endif
 {
-public:
-    UniG(ApproxMC::AppMC* appmc);
-    ~UniG();
-    static std::string get_version_sha1();
-    void sample(
-        const ApproxMC::SolCount* sol_count,
-        uint32_t num_samples);
+ public:
+  UniG(ApproxMC::AppMC* appmc);
+  ~UniG();
+  static std::string get_version_sha1();
+  void sample(const ApproxMC::SolCount* sol_count, uint32_t num_samples);
 
-    //Misc options -- do NOT to change unless you know what you are doing!
-    void set_kappa(double kappa);
-    void set_multisample(bool multisample);
-    void set_only_indep_samples(bool only_indep_samples);
-    void set_verb_sampler_cls(bool verb_sampler_cls);
-    void set_force_sol_extension(bool force_sol_extension);
-    void set_verbosity(uint32_t verb);
-    void set_callback(UniGen::callback f, void* data);
-    void set_full_sampling_vars(const std::vector<uint32_t>& vars);
-    void set_empty_sampling_vars(const std::vector<uint32_t>& vars);
+  // Misc options -- do NOT to change unless you know what you are doing!
+  void set_kappa(double kappa);
+  void set_multisample(bool multisample);
+  void set_only_indep_samples(bool only_indep_samples);
+  void set_verb_sampler_cls(bool verb_sampler_cls);
+  void set_force_sol_extension(bool force_sol_extension);
+  void set_verbosity(uint32_t verb);
+  void set_callback(UniGen::callback f, void* data);
+  void set_full_sampling_vars(const std::vector<uint32_t>& vars);
+  void set_empty_sampling_vars(const std::vector<uint32_t>& vars);
 
-    //Querying default values
-    double get_kappa() const;
-    bool get_multisample() const;
-    bool get_only_indep_samples() const;
-    bool get_verb_sampler_cls() const;
-    bool get_force_sol_extension() const;
-    bool get_verb_banning_cls() const;
-    const std::vector<uint32_t>& get_full_sampling_vars() const;
-    const std::vector<uint32_t>& get_empty_sampling_vars() const;
+  // Querying default values
+  double get_kappa() const;
+  bool get_multisample() const;
+  bool get_only_indep_samples() const;
+  bool get_verb_sampler_cls() const;
+  bool get_force_sol_extension() const;
+  bool get_verb_banning_cls() const;
+  const std::vector<uint32_t>& get_full_sampling_vars() const;
+  const std::vector<uint32_t>& get_empty_sampling_vars() const;
 
-private:
-    ////////////////////////////
-    // Do not bother with this, it's private
-    ////////////////////////////
-    UniGenPrivateData* data;
+ private:
+  ////////////////////////////
+  // Do not bother with this, it's private
+  ////////////////////////////
+  UniGenPrivateData* data;
 };
 
-}
+}  // namespace UniGen
