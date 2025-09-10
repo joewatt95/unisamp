@@ -99,14 +99,14 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # contains some library search cmake scripts
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
-include (GenerateExportHeader)
-include (GNUInstallDirs)
+# include (GenerateExportHeader)
+# include (GNUInstallDirs)
 
 # generate JSON file of compile commands -- useful for code extension
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
+# find_package(Threads REQUIRED)
 find_package(sbva CONFIG REQUIRED)
 
 option(SANITIZE "Use Clang sanitizers. You MUST use clang++ as the compiler for this to work" OFF)
