@@ -17,48 +17,42 @@ vcpkg_make_configure(
     --competition
 )
 
-vcpkg_execute_required_process(
-  COMMAND make
-  WORKING_DIRECTORY "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel"
-  LOGNAME "build-${TARGET_TRIPLET}-rel"
-)
+if(VCPKG_BUILD_TYPE STREQUAL "debug")
+  set(BUILD_SUFFIX "dbg")
+  set(DEST_DIR "${CURRENT_PACKAGES_DIR}/debug")
+elseif(VCPKG_BUILD_TYPE STREQUAL "release")
+  set(BUILD_SUFFIX "rel")
+  set(DEST_DIR "${CURRENT_PACKAGES_DIR}")
+else()
+  set(BUILD_SUFFIX "dbg" "rel")
+  set(DEST_DIR "${CURRENT_PACKAGES_DIR}/debug" ${CURRENT_PACKAGES_DIR})
+endif()
 
-# vcpkg_make_install(
-#   MAKEFILE "makefile.in"
-#   TARGETS "all"
-# )
+if(VCPKG_LIBRARY_LINKAGE STREQUAL "static")
+  set(LIB_FILE "libcadical.a")
+elseif(VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
+  set(LIB_FILE "libcadical.so")
+else()
+  message(WARNING "VCPKG_LIBRARY_LINKAGE is not 'static' or 'dynamic'. Current value: ${VCPKG_LIBRARY_LINKAGE}")
+endif()
 
-file(
-  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/build/libcadical.a"
-  DESTINATION "${CURRENT_PACKAGES_DIR}/lib"
-)
-file(
-  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/build/libcadical.a"
-  DESTINATION "${CURRENT_PACKAGES_DIR}/debug/lib"
-)
+foreach(build_suffix dest_dir IN ZIP_LISTS BUILD_SUFFIX DEST_DIR)
+  vcpkg_execute_required_process(
+    COMMAND make "-j8"
+    WORKING_DIRECTORY "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-${build_suffix}"
+    LOGNAME "build-${TARGET_TRIPLET}-${build_suffix}"
+  )
 
-file(
-  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/build/libcadical.so"
-  DESTINATION "${CURRENT_PACKAGES_DIR}/lib"
-)
-file(
-  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/build/libcadical.so"
-  DESTINATION "${CURRENT_PACKAGES_DIR}/debug/lib"
-)
+  file(
+    INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-${build_suffix}/build/${LIB_FILE}"
+    DESTINATION "${dest_dir}/lib"
+  )
 
-file(GLOB CADICAL_HEADERS "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/src/*.hpp")
-file(
-  INSTALL ${CADICAL_HEADERS}
-  DESTINATION "${CURRENT_PACKAGES_DIR}/include"
-)
-file(
-  INSTALL ${CADICAL_HEADERS}
-  DESTINATION "${CURRENT_PACKAGES_DIR}/debug/include"
-)
-
-# file(
-#   INSTALL ${CADICAL_HEADERS}
-#   DESTINATION "${CURRENT_PACKAGES_DIR}${PATH_SUFFIX_DEBUG}/../include"
-# )
+  file(GLOB CADICAL_HEADERS "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-${build_suffix}/src/*.hpp")
+  file(
+    INSTALL ${CADICAL_HEADERS}
+    DESTINATION "${dest_dir}/include"
+  )
+endforeach()
 
 vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/LICENSE")

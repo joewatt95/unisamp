@@ -1,13 +1,16 @@
 {
-  "version": 2,
+  "version": 10,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 17,
+    "patch": 0
+  },
   "configurePresets": [
     {
-      "name": "vcpkg",
+      "name": "vcpkg-default",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build",
-      "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-      }
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
     }
   ]
 }

@@ -4,6 +4,9 @@
   "homepage": "https://github.com/meelgroup/sbva",
   "description": "Tool for reducing SAT formulas using structured bounded variable additio",
   "dependencies": [
-    "vcpkg-cmake"
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    }
   ]
 }

@@ -4,7 +4,10 @@
   "homepage": "https://github.com/msoos/cryptominisat",
   "description": "Cryptominisat SAT solver",
   "dependencies": [
-    "vcpkg-cmake",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
     {
       "name": "gmp",
       "version>=": "6.3.0"

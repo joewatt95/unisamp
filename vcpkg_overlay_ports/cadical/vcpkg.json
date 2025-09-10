@@ -4,6 +4,9 @@
   "homepage": "https://github.com/meelgroup/cadical",
   "description": "Simple CDCL satisfiability solver",
   "dependencies": [
-    "vcpkg-make"
+    {
+      "name": "vcpkg-make",
+      "host": true
+    }
   ]
 }

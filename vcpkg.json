@@ -2,7 +2,10 @@
   "name": "unigen",
   "version-string": "0.0.1",
   "dependencies": [
-    "vcpkg-cmake",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
     {
       "name": "approxmc",
       "version>=": "4.2.0"

@@ -12,70 +12,47 @@ set(ENV{CADICAL_INSTALL_DIR} ${CURRENT_INSTALLED_DIR})
 set(ENV{CADICAL_VERSION} "2.0.0")
 set(ENV{CADICAL_GITID} "19b73b36ab9a0be427985abfb599be2da454225c")
 
-# file(
-#   INSTALL "${CURRENT_PACKAGES_DIR}/lib/libcadical.a"
-#   DESTINATION "${CURRENT_BUILDTREES_DIR}/cadical/build"
-# )
-
-# file(
-#   INSTALL "${CURRENT_PACKAGES_DIR}/include/cadical.hpp"
-#   DESTINATION "${CURRENT_BUILDTREES_DIR}/cadical/src"
-# )
-
-# file(
-#   WRITE "${CURRENT_BUILDTREES_DIR}/cadical/VERSION"
-#   "2.0.0"
-# )
-
 vcpkg_make_configure(
   SOURCE_PATH "${SOURCE_PATH}"
   COPY_SOURCE
   DISABLE_DEFAULT_OPTIONS
 )
 
-vcpkg_execute_required_process(
-  COMMAND make
-  WORKING_DIRECTORY "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel"
-  LOGNAME "build-${TARGET_TRIPLET}-rel"
-)
+if(VCPKG_BUILD_TYPE STREQUAL "debug")
+  set(BUILD_SUFFIX "dbg")
+  set(DEST_DIR "${CURRENT_PACKAGES_DIR}/debug")
+elseif(VCPKG_BUILD_TYPE STREQUAL "release")
+  set(BUILD_SUFFIX "rel")
+  set(DEST_DIR "${CURRENT_PACKAGES_DIR}")
+else()
+  set(BUILD_SUFFIX "dbg" "rel")
+  set(DEST_DIR "${CURRENT_PACKAGES_DIR}/debug" ${CURRENT_PACKAGES_DIR})
+endif()
 
-# vcpkg_build_make(
-#   BUILD_TARGET "all"
-#   MAKEFILE "makefile.in"
-# )
+if(VCPKG_LIBRARY_LINKAGE STREQUAL "static")
+  set(LIB_FILE "libcadiback.a")
+elseif(VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
+  set(LIB_FILE "libcadiback.so")
+else()
+  message(WARNING "VCPKG_LIBRARY_LINKAGE is not 'static' or 'dynamic'. Current value: ${VCPKG_LIBRARY_LINKAGE}")
+endif()
 
-file(
-  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/libcadiback.a"
-  DESTINATION "${CURRENT_PACKAGES_DIR}/lib"
-)
-file(
-  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/libcadiback.a"
-  DESTINATION "${CURRENT_PACKAGES_DIR}/debug/lib"
-)
+foreach(build_suffix dest_dir IN ZIP_LISTS BUILD_SUFFIX DEST_DIR)
+  vcpkg_execute_required_process(
+    COMMAND make "-j8" ${LIB_FILE}
+    WORKING_DIRECTORY "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-${build_suffix}"
+    LOGNAME "build-${TARGET_TRIPLET}-${build_suffix}"
+  )
 
-file(
-  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/libcadiback.so"
-  DESTINATION "${CURRENT_PACKAGES_DIR}/lib"
-)
-file(
-  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/libcadiback.so"
-  DESTINATION "${CURRENT_PACKAGES_DIR}/debug/lib"
-)
+  file(
+    INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-${build_suffix}/${LIB_FILE}"
+    DESTINATION "${dest_dir}/lib"
+  )
 
-file(
-  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/include/cadiback.h"
-  DESTINATION "${CURRENT_PACKAGES_DIR}/include"
-)
-file(
-  INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/include/cadiback.h"
-  DESTINATION "${CURRENT_PACKAGES_DIR}/debug/include"
-)
-
-# file(REMOVE_RECURSE "${CURRENT_BUILDTREES_DIR}/cadical")
+  file(
+    INSTALL "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-${build_suffix}/include/cadiback.h"
+    DESTINATION "${dest_dir}/include"
+  )
+endforeach()
 
 vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/LICENSE")
-
-# vcpkg_make_install(
-#   MAKEFILE "makefile.in"
-#   TARGETS ""
-# )

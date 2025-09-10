@@ -4,7 +4,10 @@
   "homepage": "https://github.com/meelgroup/arjun",
   "description": "Minimal independent set calculator and CNF minimizer",
   "dependencies": [
-    "vcpkg-cmake",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
     {
       "name": "mpfr",
       "version>=": "4.2.2"
