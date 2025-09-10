@@ -78,7 +78,7 @@ project(unigen)
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-add_executable(unigen
+add_executable(unigen_static
   ${PROJECT_SOURCE_DIR}/src/main.cpp
   ${PROJECT_SOURCE_DIR}/src/sampler.cpp
   ${PROJECT_SOURCE_DIR}/src/unigen.cpp
@@ -86,13 +86,9 @@ add_executable(unigen
 )
 # target_link_libraries(unigen PRIVATE gmp zlib mpfr cereal armadillo ensmallen mlpack)
 
-# find_package(ZLIB REQUIRED)
-# find_package(cryptominisat5 CONFIG REQUIRED)
-# find_package(approxmc CONFIG REQUIRED)
-# find_package(arjun CONFIG REQUIRED)
-
-target_link_libraries(unigen PRIVATE
-  ZLIB::ZLIB cryptominisat5 approxmc arjun
+target_link_libraries(unigen_static PRIVATE
+  ZLIB::ZLIB PkgConfig::gmp
+  cryptominisat5 approxmc arjun
 )
 
 enable_language(CXX)
@@ -111,7 +107,7 @@ include (GNUInstallDirs)
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package (Threads REQUIRED)
+find_package(Threads REQUIRED)
 find_package(sbva CONFIG REQUIRED)
 
 option(SANITIZE "Use Clang sanitizers. You MUST use clang++ as the compiler for this to work" OFF)
@@ -426,17 +422,18 @@ endmacro()
 # -----------------------------------------------------------------------------
 option(NOZLIB "Don't use zlib" OFF)
 if (NOT NOZLIB AND NOT (STATICCOMPILE AND WIN32))
-    find_package(ZLIB)
+    find_package(ZLIB REQUIRED)
     if (ZLIB_FOUND)
         message(STATUS "OK, Found ZLIB!")
-        include_directories(${ZLIB_INCLUDE_DIR})
-        link_directories(${ZLIB_LIB_DIR})
+        # include_directories(${ZLIB_INCLUDE_DIR})
+        # link_directories(${ZLIB_LIB_DIR})
         add_definitions( -DUSE_ZLIB )
     else (ZLIB_FOUND)
         message(STATUS "WARNING: Did not find ZLIB, gzipped file support will be disabled")
     endif (ZLIB_FOUND)
 endif()
-find_package(GMP REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(gmp REQUIRED IMPORTED_TARGET gmp)
 find_package(cryptominisat5 CONFIG REQUIRED)
 find_package(approxmc CONFIG REQUIRED)
 find_package(arjun CONFIG REQUIRED)

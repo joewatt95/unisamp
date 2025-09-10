@@ -50,17 +50,17 @@ set(unigen_lib_files
   ${CMAKE_CURRENT_BINARY_DIR}/GitSHA1.cpp
 )
 
-add_library(unigen_lib ${unigen_lib_files})
+add_library(unigen ${unigen_lib_files})
 
-target_link_libraries(unigen_lib
-    LINK_PUBLIC ${CRYPTOMINISAT5_LIBRARIES}
-    LINK_PUBLIC ${ARJUN_LIBRARIES}
-    LINK_PUBLIC ${APPROXMC_LIBRARIES}
-    LINK_PUBLIC ${MPFR_LIBRARIES}
-    LINK_PUBLIC ${GMP_LIBRARY}
+target_link_libraries(unigen PUBLIC
+  ${CRYPTOMINISAT5_LIBRARIES}
+  ${ARJUN_LIBRARIES}
+  ${APPROXMC_LIBRARIES}
+  # ${MPFR_LIBRARIES}
+  # ${GMP_LIBRARY}
 )
 
-set_target_properties(unigen_lib PROPERTIES
+set_target_properties(unigen PROPERTIES
   PUBLIC_HEADER "${unigen_public_headers}"
   VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
   SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
@@ -68,29 +68,29 @@ set_target_properties(unigen_lib PROPERTIES
   INSTALL_RPATH_USE_LINK_PATH TRUE
 )
 
-add_executable(unigen_cli main.cpp)
-set(unigen_exec_link_libs "unigen_lib")
+add_executable(unigen_dynamic main.cpp)
+set(unigen_exec_link_libs "unigen")
 IF (ZLIB_FOUND)
     set(unigen_exec_link_libs ${unigen_exec_link_libs} ${ZLIB_LIBRARY})
 ENDIF()
-target_link_libraries(unigen_cli ${unigen_exec_link_libs})
+target_link_libraries(unigen_dynamic ${unigen_exec_link_libs})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    set_target_properties(unigen_cli PROPERTIES
+    set_target_properties(unigen_dynamic PROPERTIES
       # OUTPUT_NAME unigen
       RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}
       INSTALL_RPATH_USE_LINK_PATH TRUE
       LINK_FLAGS "-s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='[\"callMain\", \"ccall\", \"cwrap\", \"FS\", \"print\"]' -s FORCE_FILESYSTEM=1"
     )
 else()
-    set_target_properties(unigen_cli PROPERTIES
+    set_target_properties(unigen_dynamic PROPERTIES
       # OUTPUT_NAME unigen
       RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}
       INSTALL_RPATH_USE_LINK_PATH TRUE
     )
 endif()
 
-unigen_add_public_header(unigen ${CMAKE_CURRENT_SOURCE_DIR}/unigen.h )
+unigen_add_public_header(unigen ${CMAKE_CURRENT_SOURCE_DIR}/unigen.h)
 
 # -----------------------------------------------------------------------------
 # Copy public headers into build directory include directory.
@@ -109,7 +109,7 @@ foreach(public_header ${unigen_public_headers})
     )
 endforeach()
 
-install(TARGETS unigen_lib
+install(TARGETS unigen
     EXPORT ${UNIGEN_EXPORT_NAME}
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -117,7 +117,7 @@ install(TARGETS unigen_lib
     PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/unigen"
 )
 
-install(TARGETS unigen_cli
+install(TARGETS unigen_dynamic
     EXPORT ${UNIGEN_EXPORT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

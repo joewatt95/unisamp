@@ -25,7 +25,7 @@
  THE SOFTWARE.
  */
 
-#include "argparse.hpp"
+#include <argparse/argparse.hpp>
 using std::string;
 using std::vector;
 
