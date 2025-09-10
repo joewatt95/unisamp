@@ -87,8 +87,7 @@ add_executable(unigen_static
 # target_link_libraries(unigen PRIVATE gmp zlib mpfr cereal armadillo ensmallen mlpack)
 
 target_link_libraries(unigen_static PRIVATE
-  ZLIB::ZLIB PkgConfig::gmp
-  cryptominisat5 approxmc arjun
+  ZLIB::ZLIB cryptominisat5 approxmc arjun
 )
 
 enable_language(CXX)
@@ -432,8 +431,8 @@ if (NOT NOZLIB AND NOT (STATICCOMPILE AND WIN32))
         message(STATUS "WARNING: Did not find ZLIB, gzipped file support will be disabled")
     endif (ZLIB_FOUND)
 endif()
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(gmp REQUIRED IMPORTED_TARGET gmp)
+# find_package(PkgConfig REQUIRED)
+# pkg_check_modules(gmp REQUIRED IMPORTED_TARGET gmp)
 find_package(cryptominisat5 CONFIG REQUIRED)
 find_package(approxmc CONFIG REQUIRED)
 find_package(arjun CONFIG REQUIRED)

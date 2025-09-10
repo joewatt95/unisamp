@@ -71,7 +71,7 @@ set_target_properties(unigen PROPERTIES
 add_executable(unigen_dynamic main.cpp)
 set(unigen_exec_link_libs "unigen")
 IF (ZLIB_FOUND)
-    set(unigen_exec_link_libs ${unigen_exec_link_libs} ${ZLIB_LIBRARY})
+  set(unigen_exec_link_libs ${unigen_exec_link_libs} ${ZLIB_LIBRARY})
 ENDIF()
 target_link_libraries(unigen_dynamic ${unigen_exec_link_libs})
 
