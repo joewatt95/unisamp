@@ -1,6 +1,6 @@
 {
   "name": "unigen",
-  "version-string": "0.0.1",
+  "version-string": "2.7.0",
   "dependencies": [
     {
       "name": "vcpkg-cmake",
