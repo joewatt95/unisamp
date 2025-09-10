@@ -9,6 +9,14 @@
       "host": true
     },
     {
+      "name": "gmp",
+      "version>=": "6.3.0"
+    },
+    {
+      "name": "cryptominisat",
+      "version>=": "5.13.0-0ab1e44"
+    },
+    {
       "name": "arjun",
       "version>=": "2.6.1-9130e58"
     }
