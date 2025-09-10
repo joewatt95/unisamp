@@ -6,7 +6,7 @@ vcpkg_from_github(
 )
 
 vcpkg_cmake_configure(
-  SOURCE_PATH "${SOURCE_PATH}"
+  SOURCE_PATH ${SOURCE_PATH}
   OPTIONS
     -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
 )

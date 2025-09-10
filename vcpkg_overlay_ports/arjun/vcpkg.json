@@ -1,6 +1,6 @@
 {
   "name": "arjun",
-  "version-string": "9130e583a82cfec1cf12c198dc6fdf1a64e39481",
+  "version-string": "2.6.1-9130e58",
   "homepage": "https://github.com/meelgroup/arjun",
   "description": "Minimal independent set calculator and CNF minimizer",
   "dependencies": [
@@ -16,7 +16,13 @@
       "name": "mlpack",
       "version>=": "4.6.2"
     },
-    "cryptominisat",
-    "sbva"
+    {
+      "name": "cryptominisat",
+      "version>=": "5.13.0-0ab1e44"
+    },
+    {
+      "name": "sbva",
+      "version>=": "2025.06-0faa08c"
+    }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "cryptominisat",
-  "version-string": "0ab1e4406edc952a975347e7f3365f28d01f7f67",
+  "version-string": "5.13.0-0ab1e44",
   "homepage": "https://github.com/msoos/cryptominisat",
   "description": "Cryptominisat SAT solver",
   "dependencies": [
@@ -18,7 +18,7 @@
     },
     {
       "name": "cadiback",
-      "version>=": "0.2.1"
+      "version>=": "0.2.1-f3b1b21"
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "approxmc",
-  "version-string": "4.2.0",
+  "version-string": "4.2.0-27740ac",
   "homepage": "https://github.com/meelgroup/approxmc",
   "description": "Approximate Model Counter",
   "dependencies": [
@@ -8,6 +8,9 @@
       "name": "vcpkg-cmake",
       "host": true
     },
-   "arjun"
+    {
+      "name": "arjun",
+      "version>=": "2.6.1-9130e58"
+    }
   ]
 }

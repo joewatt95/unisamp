@@ -12,27 +12,27 @@ set(VCPKG_C_FLAGS "${VCPKG_C_FLAGS} -fPIC")
 set(VCPKG_CXX_FLAGS "${VCPKG_CXX_FLAGS} -fPIC")
 
 vcpkg_make_configure(
-  SOURCE_PATH "${SOURCE_PATH}"
+  SOURCE_PATH ${SOURCE_PATH}
   COPY_SOURCE
   DISABLE_DEFAULT_OPTIONS
   OPTIONS
     --competition
 )
 
-if(VCPKG_BUILD_TYPE STREQUAL "debug")
+if(VCPKG_BUILD_TYPE MATCHES debug)
   set(BUILD_SUFFIX "dbg")
   set(DEST_DIR "${CURRENT_PACKAGES_DIR}/debug")
-elseif(VCPKG_BUILD_TYPE STREQUAL "release")
+elseif(VCPKG_BUILD_TYPE MATCHES release)
   set(BUILD_SUFFIX "rel")
-  set(DEST_DIR "${CURRENT_PACKAGES_DIR}")
+  set(DEST_DIR ${CURRENT_PACKAGES_DIR})
 else()
   set(BUILD_SUFFIX "dbg" "rel")
   set(DEST_DIR "${CURRENT_PACKAGES_DIR}/debug" ${CURRENT_PACKAGES_DIR})
 endif()
 
-if(VCPKG_LIBRARY_LINKAGE STREQUAL "static")
+if(VCPKG_LIBRARY_LINKAGE MATCHES static)
   set(LIB_FILE "libcadical.a")
-elseif(VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
+elseif(VCPKG_LIBRARY_LINKAGE MATCHES dynamic)
   set(LIB_FILE "libcadical.so")
 else()
   message(WARNING "VCPKG_LIBRARY_LINKAGE is not 'static' or 'dynamic'. Current value: ${VCPKG_LIBRARY_LINKAGE}")
