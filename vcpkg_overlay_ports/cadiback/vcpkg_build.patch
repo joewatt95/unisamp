@@ -1,3 +1,19 @@
+Some cleanup and tweaks to the build process (i.e. configure, makefile.in and
+generate) so that it builds with vcpkg. Specifically, we modify them to use the
+following environment variables (which are set by our portfile):
+- $CADICAL_INSTALL_DIR to indicate the directory that vcpkg installed cadical to.
+- $CADICAL_VERSION to indicate Cadical's version string.
+- $CADICAL_GITID to indicate Cadical's git commit ID string.
+
+These tweaks are needed as previously, the build process assumed that Cadical was
+built in its git repository which lives in the parent directory of Cadiback's
+source, i.e. "<path_to_cadiback_source>/../cadical", so that it could obtain
+the built files, version and git commit ID strings from there. 
+However, we can no longer assume such a directory structure as we are compiling
+and installing our dependencies (including Cadical) via vcpkg.
+Hence, we tweak the build process to use these environment variables, which we 
+set in our portfile.
+
 diff --git a/configure b/configure
 index f8f1457..17f2106 100755
 --- a/configure
