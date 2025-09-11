@@ -3,6 +3,7 @@
   "files.associations": {
     "**/debian/*.install": "plain",
     ".fantomasignore": "ignore",
-    "set": "cpp"
+    "set": "cpp",
+    "vector": "cpp"
   }
 }
