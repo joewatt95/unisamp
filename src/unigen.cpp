@@ -31,6 +31,7 @@
 #include "GitSHA1.h"
 #include "config.h"
 #include "sampler.h"
+
 using namespace ApproxMC;
 
 using std::cout;

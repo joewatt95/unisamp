@@ -23,6 +23,7 @@ THE SOFTWARE.
 
 #ifndef TIME_MEM_H
 #define TIME_MEM_H
+
 #include <signal.h>
 #include <time.h>
 

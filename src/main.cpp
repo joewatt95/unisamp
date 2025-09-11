@@ -25,18 +25,16 @@
  THE SOFTWARE.
  */
 
-#include <argparse/argparse.hpp>
-using std::string;
-using std::vector;
-
-#if defined(__GNUC__) && defined(__linux__)
-#include <fenv.h>
-#endif
-
 #include <approxmc/approxmc.h>
 #include <arjun/arjun.h>
 #include <cryptominisat5/dimacsparser.h>
 #include <cryptominisat5/streambuffer.h>
+
+#include <argparse/argparse.hpp>
+
+#if defined(__GNUC__) && defined(__linux__)
+#include <fenv.h>
+#endif
 
 #include <fstream>
 #include <set>
@@ -50,6 +48,7 @@ using std::cout;
 using std::endl;
 using std::set;
 using std::string;
+using std::vector;
 
 ApproxMC::AppMC* appmc = NULL;
 UniG* unigen = NULL;
