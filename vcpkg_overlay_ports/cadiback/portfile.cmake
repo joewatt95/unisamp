@@ -5,7 +5,7 @@ vcpkg_from_github(
   SHA512 4b73a4208b6a01d3ac88ac7bb6b0775bc166dcab8448486a90c839083b452b0ca07ce13f3f490b8d6305d9e13d9dc485e4126bb998e248dda5f9f9704a39a325
   HEAD_REF synthesis
   PATCHES
-    vcpkg_build.patch
+    use_vcpkg_deps.patch
 )
 
 set(ENV{CADICAL_INSTALL_DIR} ${CURRENT_INSTALLED_DIR})

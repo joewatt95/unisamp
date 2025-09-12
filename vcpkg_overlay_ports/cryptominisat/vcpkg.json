@@ -9,6 +9,10 @@
       "host": true
     },
     {
+      "name": "argparse",
+      "version>=": "3.2"
+    },
+    {
       "name": "gmp",
       "version>=": "6.3.0"
     },
