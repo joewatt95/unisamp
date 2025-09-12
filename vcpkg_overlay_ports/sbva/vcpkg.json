@@ -7,6 +7,14 @@
     {
       "name": "vcpkg-cmake",
       "host": true
+    },
+    {
+      "name": "argparse",
+      "version>=": "3.2"
+    },
+    {
+      "name": "eigen3",
+      "version>=": "3.4.1-250818"
     }
   ]
 }
