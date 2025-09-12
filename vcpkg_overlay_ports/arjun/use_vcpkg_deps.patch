@@ -1,3 +1,15 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 37cd521..5adbcfe 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -112,6 +112,7 @@ endif()
+ 
+ set(THREADS_PREFER_PTHREAD_FLAG ON)
+ find_package (Threads REQUIRED)
++find_package (Eigen3 CONFIG REQUIRED)
+ find_package (sbva REQUIRED)
+ message(STATUS "Found SBVA includes at: ${SBVA_INCLUDE_DIRS}")
+ find_package(GMP REQUIRED)
 diff --git a/src/main.cpp b/src/main.cpp
 index da6ee9f..a077052 100644
 --- a/src/main.cpp

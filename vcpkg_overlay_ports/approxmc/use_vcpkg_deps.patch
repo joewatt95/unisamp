@@ -1,3 +1,15 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d6b22a4..140859a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -398,6 +398,7 @@ message(STATUS "CryptoMiniSat5 include dirs: ${CRYPTOMINISAT5_INCLUDE_DIRS}")
+ find_package(arjun CONFIG REQUIRED)
+ message(STATUS "Arjun dynamic lib : ${ARJUN_LIBRARIES}")
+ message(STATUS "Arjun include dirs: ${ARJUN_INCLUDE_DIRS}")
++find_package(Eigen3 CONFIG REQUIRED)
+ find_package(sbva CONFIG REQUIRED)
+ 
+ # -----------------------------------------------------------------------------
 diff --git a/src/main.cpp b/src/main.cpp
 index a5b8e5f..bff9d26 100644
 --- a/src/main.cpp
