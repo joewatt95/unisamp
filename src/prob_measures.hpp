@@ -1,3 +1,4 @@
+#include <concepts>
 #include <functional>
 #include <iterator>
 #include <optional>
@@ -5,14 +6,17 @@
 #include <ranges>
 
 /**
- * @brief Represents a sub-probability measure.
+ * @brief Represents sub-probability measures as a failable, context-dependent
+ * computation.
  *
- * A SubProbMeasure encapsulates a probabilistic function that takes a random
- * number generator (Rng) and returns an optional value of type A. It models
- * computations that depend on an RNG and can fail (return nullopt).
+ * This struct models the `ReaderT Maybe` monad transformer. It encapsulates a
+ * function that depends on a shared environment (the random number generator
+ * `Rng`) which it can mutate, and which may fail to produce a value
+ * (`std::optional`). The wrapped function signature is `Rng& ->
+ * std::optional<A>`.
  *
  * @tparam A The type of the value to be sampled.
- * @tparam Rng The type of the random number generator.
+ * @tparam Rng The type of the random number generator (e.g., std::mt19937).
  */
 template <typename A, typename Rng = std::mt19937>
 struct SubProbMeasure {
@@ -41,6 +45,61 @@ struct SubProbMeasure {
     static thread_local Rng default_rng{std::random_device{}()};
     return run(default_rng);
   }
+
+  // === Core Primitives ===
+
+  /**
+   * @brief Lifts a pure value into a SubProbMeasure (monadic return).
+   *
+   * Creates a measure that always succeeds and returns the given value
+   * without consuming any randomness.
+   * @param value The value to lift.
+   * @return A deterministic SubProbMeasure.
+   */
+  static SubProbMeasure<A, Rng> pure(const A value) {
+    return SubProbMeasure{.run = [v = std::move(value)](Rng&) { return v; }};
+  }
+
+  /**
+   * @brief Creates a measure that always fails.
+   * @return A `SubProbMeasure` that always yields `std::nullopt`.
+   */
+  static SubProbMeasure<A, Rng> fail() {
+    return SubProbMeasure{.run = [](Rng&) { return std::nullopt; }};
+  }
+
+  // === Core Samplers ===
+
+  /**
+   * @brief A primitive measure for a Bernoulli trial.
+   * @param p The probability of success (true).
+   * @return A SubProbMeasure that samples a boolean value.
+   */
+  static SubProbMeasure<bool, Rng> bernoulli(double p) {
+    return SubProbMeasure<bool, Rng>{.run = [p](Rng& rng) {
+      std::bernoulli_distribution dist(p);
+      return dist(rng);
+    }};
+  }
+
+  /**
+   * @brief A primitive measure for a uniform integer distribution.
+   * @tparam IntType The integral type to sample (e.g., int, long, size_t).
+   * @param min The minimum value of the range (inclusive).
+   * @param max The maximum value of the range (inclusive).
+   * @return A SubProbMeasure that samples an int.
+   */
+  template <std::integral IntType = int>
+  static SubProbMeasure<IntType, Rng> uniform_int(IntType min, IntType max) {
+    return SubProbMeasure<IntType, Rng>{
+        .run = [min, max](Rng& rng) -> std::optional<IntType> {
+          if (min > max) return std::nullopt;
+          std::uniform_int_distribution<IntType> dist(min, max);
+          return dist(rng);
+        }};
+  }
+
+  // --- Compositional Methods ---
 
   /**
    * @brief Implements Kleisli composition (monadic bind).
@@ -75,51 +134,83 @@ struct SubProbMeasure {
   }
 
   /**
-   * @brief Returns a new measure by scaling this measure's probability.
+   * @brief Implements functor map (fmap).
    *
-   * The new measure samples from this measure with a probability of `scale`.
-   * With probability `1 - scale`, it returns nullopt.
+   * Applies a pure function to the result of this measure.
    *
-   * @param scale A scaling factor in the interval [0, 1].
-   * - If scale <= 0, the resulting measure always returns nullopt.
-   * - If scale >= 1, the resulting measure is identical to this one.
-   * @return A new, scaled SubProbMeasure.
+   * @param f A pure function of type `A -> B` to apply to the result.
+   * @return A new `SubProbMeasure` with a transformed result value.
    */
-  auto scale(double scale) const {
-    if (scale <= 0.0)
-      return SubProbMeasure<A, Rng>{.run = [](Rng&) { return std::nullopt; }};
-    if (scale >= 1.0) return *this;
+  template <typename F>
+  auto map(F&& f) const {
+    return *this >>= [f = std::forward<F>(f)](const A& a) {
+      // Apply the pure function f and lift the result back into a measure.
+      return SubProbMeasure<decltype(f(a)), Rng>::pure(f(a));
+    };
+  }
 
-    return SubProbMeasure<A, Rng>{
-        .run = [scale, this_run = this->run](Rng& rng) -> std::optional<A> {
-          std::bernoulli_distribution dist(scale);
-          // Sample from the original measure if the Bernoulli succeeds, else fail. 
-          return dist(rng) ? this_run(rng) : std::nullopt;
+  /**
+   * @brief Creates a measure that fails if a boolean condition is false.
+   *
+   * This method acts as a monadic guard, a standard pattern in functional
+   * programming. It is useful for introducing conditional failure into a
+   * chain of computations. If the condition is true, the measure succeeds
+   * with a trivial `std::monostate` value, allowing the chain to proceed.
+   * If the condition is false, the measure fails, halting the chain.
+   *
+   * @param condition The boolean condition to check. The measure will fail if
+   * this evaluates to `false`.
+   * @return A `SubProbMeasure` that succeeds with a trivial value if
+   * `condition` is true, and fails otherwise.
+   */
+  static SubProbMeasure<std::monostate, Rng> guard(bool condition) {
+    return SubProbMeasure<std::monostate, Rng>{
+        .run = [condition](Rng&) -> std::optional<std::monostate> {
+          return condition ? std::optional(std::monostate{}) : std::nullopt;
         }};
   }
+
+  // === Composed Samplers ===
+
+  /**
+   * @brief Creates a uniform distribution measure from a multipass range.
+   * @tparam Range The type of the input range.
+   * @param range The range of elements to sample from.
+   * @return A SubProbMeasure representing the uniform distribution.
+   */
+  template <std::ranges::forward_range Range>
+    requires std::is_same_v<std::ranges::range_value_t<Range>, A>
+  static SubProbMeasure uniform_range(Range range) {
+    if (std::ranges::empty(range)) return SubProbMeasure::fail();
+
+    std::size_t size = std::ranges::distance(range);
+
+    auto sample_index =
+        SubProbMeasure<std::size_t, Rng>::uniform_int(std::size_t{0}, size - 1);
+
+    return sample_index.map([r = std::move(range)](std::size_t index) {
+      return *std::ranges::next(std::ranges::begin(r), index);
+    });
+  }
+
+  /**
+   * @brief Returns a new measure by scaling this measure's probability.
+   * @param factor The scaling factor in the interval [0, 1].
+   * @return A new, scaled SubProbMeasure.
+   */
+  auto scale(double factor) const {
+    // Handle edge cases directly for efficiency
+    if (factor <= 0.0) return SubProbMeasure::fail();
+    if (factor >= 1.0) return *this;
+
+    // 1. Run a Bernoulli trial.
+    // 2. Bind the boolean result to a monadic guard that fails if the trial
+    // returned false.
+    // 3. If the monadic guard passes, bind its trivial result to a continuation
+    // that returns the original measure.
+    return (SubProbMeasure::bernoulli(factor) >>= &SubProbMeasure::guard) >>=
+           [this_measure = *this](const std::monostate&) {
+             return this_measure;
+           };
+  }
 };
-
-/**
- * @brief Creates a sub-probability measure for a uniform distribution over a
- * range.
- *
- * @tparam Range A multipass range type (e.g., std::vector, std::list).
- * @tparam Rng The random number generator type.
- * @param range The input range of elements to sample from.
- * @return A SubProbMeasure that, when run, samples one element uniformly
- * from the range. Returns nullopt if the range is empty.
- */
-template <std::ranges::forward_range Range, typename Rng = std::mt19937>
-auto uniform_prob_measure(Range range) {
-  using T = std::ranges::range_value_t<Range>;
-
-  return SubProbMeasure<T, Rng>{
-      .run = [r = std::move(range)](Rng& rng) -> std::optional<T> {
-        if (std::ranges::empty(r)) {
-          return std::nullopt;
-        }
-        const auto size = std::ranges::distance(r);
-        std::uniform_int_distribution<std::size_t> dist(0, size - 1);
-        return *std::ranges::next(std::ranges::begin(r), dist(rng));
-      }};
-}

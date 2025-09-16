@@ -37,7 +37,11 @@
 #endif
 
 #include <fstream>
+#include <iostream>
+#include <numeric>  // For std::accumulate
 #include <set>
+#include <string>
+#include <vector>
 
 #include "prob_measures.hpp"
 #include "time_mem.h"
@@ -270,60 +274,144 @@ void check_sanity_sampling_vars(T vars, const uint32_t nvars) {
 }
 
 int main() {
-    std::vector<std::string> fruits = {"apple", "banana", "cherry"};
-    std::vector<int> numbers = {10, 20, 30, 40, 50};
-    std::vector<std::string> empty_vec = {};
+  // Define a type alias for our specific Rng for convenience
+  using Rng = std::mt19937;
 
-    // === Example 1: Uniform Distribution ===
-    std::cout << "## Uniform Distribution Example ##\n";
-    auto uniform_fruits = uniform_prob_measure(fruits);
-    std::cout << "Sampling a fruit: " << *uniform_fruits() << std::endl;
-    std::cout << "Sampling another fruit: " << *uniform_fruits() << std::endl;
+  // --- Example 1: Basic Sampling and Failure ---
+  std::cout << "## 1. Basic Sampling & Failure ##\n";
+  {
+    using StringMeasure = SubProbMeasure<std::string, Rng>;
+    std::vector<std::string> planets = {"Mercury", "Venus", "Earth", "Mars"};
+    std::vector<std::string> empty = {};
 
-    auto uniform_empty = uniform_prob_measure(empty_vec);
-    auto result = uniform_empty();
-    std::cout << "Sampling from empty vector: "
-              << (result.has_value() ? *result : "nullopt") << std::endl;
-    std::cout << "\n---------------------------------\n\n";
+    // Create a measure that samples uniformly from the 'planets' vector
+    auto pick_planet = StringMeasure::uniform_range(planets);
 
-    // === Example 2: Scaled Distribution ===
-    std::cout << "## Scaled Distribution Example ##\n";
-    auto uniform_numbers = uniform_prob_measure(numbers);
-    auto scaled_numbers = uniform_numbers.scale(0.5);
-    int successes = 0;
-    int trials = 20;
-    std::cout << "Sampling 20 times from a measure scaled by 0.5:\n";
-    for (int i = 0; i < trials; ++i) {
-        if (auto num = scaled_numbers()) {
-            std::cout << *num << " ";
-            successes++;
-        }
+    std::cout << "Sampling a planet: " << *pick_planet() << std::endl;
+    std::cout << "Sampling another planet: " << *pick_planet() << std::endl;
+
+    // Create a measure from an empty vector, which will always fail
+    auto pick_from_empty = StringMeasure::uniform_range(empty);
+    if (!pick_from_empty()) {
+      std::cout << "Sampling from an empty vector correctly resulted in "
+                   "failure (nullopt).\n";
     }
-    std::cout << "\nSucceeded " << successes << "/" << trials << " times.\n";
-    std::cout << "\n---------------------------------\n\n";
+  }
+  std::cout << "\n" << std::string(40, '-') << "\n\n";
 
-    // === Example 3: Kleisli Composition (>>=) ===
-    std::cout << "## Kleisli Composition Example ##\n";
-    // A measure that uniformly picks one of two vectors
-    std::vector<std::vector<int>> number_groups = {{1, 2, 3}, {100, 200}};
-    auto pick_a_group = uniform_prob_measure(number_groups);
+  // --- Example 2: Transforming a Result (`map`) ---
+  std::cout << "## 2. Transforming a Result (`map`) ##\n";
+  {
+    using IntMeasure = SubProbMeasure<int, Rng>;
 
-    // A function that takes a vector and returns a measure over its elements
-    auto pick_from_group = [](const std::vector<int>& group) {
-        return uniform_prob_measure(group);
+    // 1. Start with a measure that produces an integer (a d20 roll)
+    auto roll_d20 = IntMeasure::uniform_int(1, 20);
+
+    // 2. Define a pure function to transform the integer into a string
+    auto describe_roll = [](int roll) {
+      if (roll == 20) return "Critical Hit! (" + std::to_string(roll) + ")";
+      if (roll == 1) return "Critical Fail! (" + std::to_string(roll) + ")";
+      return "Normal Roll. (" + std::to_string(roll) + ")";
     };
 
-    // Compose them: first pick a group, then pick a number from that group
-    auto pick_a_number_from_a_random_group = pick_a_group >>= pick_from_group;
+    // 3. Use `map` to create a new measure that produces a string
+    auto described_roll_measure = roll_d20.map(describe_roll);
 
-    std::cout << "Sampling from the composed measure:\n";
-    for (int i = 0; i < 10; ++i) {
-        std::cout << *pick_a_number_from_a_random_group() << " ";
+    std::cout << "Executing the transformed measure: "
+              << *described_roll_measure() << std::endl;
+  }
+  std::cout << "\n" << std::string(40, '-') << "\n\n";
+
+  // --- Example 3: Chaining Probabilistic Choices (`>>=`) ---
+  std::cout << "## 3. Chaining Probabilistic Choices (`>>=`) ##\n";
+  {
+    // Define two categories of items
+    std::vector<std::string> tools = {"Hammer", "Wrench", "Screwdriver"};
+    std::vector<std::string> fruits = {"Apple", "Banana", "Cherry"};
+    std::vector<std::vector<std::string>> categories = {tools, fruits};
+
+    // 1. First measure: probabilistically pick a category (a vector of strings)
+    auto pick_category =
+        SubProbMeasure<std::vector<std::string>, Rng>::uniform_range(
+            categories);
+
+    // 2. Second measure factory: a function that takes a category and creates a
+    // measure to pick an item from it
+    auto pick_item_from = [](const std::vector<std::string>& category) {
+      return SubProbMeasure<std::string, Rng>::uniform_range(category);
+    };
+
+    // 3. Chain them with bind (>>=): first pick a category, then pick an item
+    // from it
+    auto pick_random_item = pick_category >>= pick_item_from;
+
+    std::cout << "Picking a random item from a random category...\n";
+    for (int i = 0; i < 5; ++i) {
+      std::cout << "  - Sampled: " << *pick_random_item() << std::endl;
     }
-    std::cout << std::endl;
+  }
+  std::cout << "\n" << std::string(40, '-') << "\n\n";
 
-    return 0;
+  // --- Example 4: Scaling a Measure's Probability (`scale`) ---
+  std::cout << "## 4. Scaling a Measure's Probability (`scale`) ##\n";
+  {
+    using IntMeasure = SubProbMeasure<int, Rng>;
+    auto measure = IntMeasure::pure(42);  // A measure that always produces 42
+
+    // Scale it so it only succeeds with a 20% probability
+    auto scaled_measure = measure.scale(0.2);
+
+    int successes = 0;
+    int trials = 100;
+    for (int i = 0; i < trials; ++i) {
+      if (scaled_measure()) {
+        successes++;
+      }
+    }
+    std::cout << "Scaled measure succeeded " << successes << " out of "
+              << trials << " times.\n";
+  }
+  std::cout << "\n" << std::string(40, '-') << "\n\n";
+
+  return 0;
 }
+
+// int main() {
+//     std::vector<std::string> fruits = {"apple", "banana", "cherry"};
+//     std::vector<int> numbers = {10, 20, 30, 40, 50};
+//     std::vector<std::string> empty_vec = {};
+
+//     // === Example 1: Uniform Distribution ===
+//     std::cout << "## Uniform Distribution Example ##\n";
+//     auto uniform_fruits = SubProbMeasure<std::string>::uniform_range(fruits);
+//     std::cout << "Sampling a fruit: " << *uniform_fruits() << std::endl;
+//     std::cout << "Sampling another fruit: " << *uniform_fruits() <<
+//     std::endl;
+
+//     auto uniform_empty =
+//     SubProbMeasure<std::string>::uniform_range(empty_vec); auto result =
+//     uniform_empty(); std::cout << "Sampling from empty vector: "
+//               << (result.has_value() ? *result : "nullopt") << std::endl;
+//     std::cout << "\n---------------------------------\n\n";
+
+//     // === Example 2: Scaled Distribution ===
+//     std::cout << "## Scaled Distribution Example ##\n";
+//     auto uniform_numbers = SubProbMeasure<int>::uniform_range(numbers);
+//     auto scaled_numbers = uniform_numbers.scale(0.5);
+//     int successes = 0;
+//     int trials = 20;
+//     std::cout << "Sampling 20 times from a measure scaled by 0.5:\n";
+//     for (int i = 0; i < trials; ++i) {
+//         if (auto num = scaled_numbers()) {
+//             std::cout << *num << " ";
+//             successes++;
+//         }
+//     }
+//     std::cout << "\nSucceeded " << successes << "/" << trials << " times.\n";
+//     std::cout << "\n---------------------------------\n\n";
+
+//     return 0;
+// }
 
 // int main(int argc, char** argv) {
 // #if defined(__GNUC__) && defined(__linux__)
@@ -389,7 +477,8 @@ int main() {
 //     for (const auto& c : cnf.red_clauses) appmc->add_red_clause(c);
 //     appmc->set_multiplier_weight(cnf.multiplier_weight);
 //     print_final_indep_set(cnf.sampl_vars, orig_sampl_vars.size());
-//     cout << "c o [arjun] Arjun finished. T: " << (cpuTime() - my_time) << endl;
+//     cout << "c o [arjun] Arjun finished. T: " << (cpuTime() - my_time) <<
+//     endl;
 //   } else {
 //     parse_file(fname, appmc);
 //     sampling_vars_orig = appmc->get_sampl_vars();
