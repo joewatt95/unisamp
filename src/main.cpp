@@ -39,6 +39,7 @@
 #include <fstream>
 #include <set>
 
+#include "prob_measures.hpp"
 #include "time_mem.h"
 #include "unigen.h"
 
@@ -268,101 +269,157 @@ void check_sanity_sampling_vars(T vars, const uint32_t nvars) {
     }
 }
 
-int main(int argc, char** argv) {
-#if defined(__GNUC__) && defined(__linux__)
-  feenableexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW);
-#endif
+int main() {
+    std::vector<std::string> fruits = {"apple", "banana", "cherry"};
+    std::vector<int> numbers = {10, 20, 30, 40, 50};
+    std::vector<std::string> empty_vec = {};
 
-  // Reconstruct the command line so we can emit it later if needed
-  string command_line;
-  for (int i = 0; i < argc; i++) {
-    command_line += string(argv[i]);
-    if (i + 1 < argc) {
-      command_line += " ";
+    // === Example 1: Uniform Distribution ===
+    std::cout << "## Uniform Distribution Example ##\n";
+    auto uniform_fruits = uniform_prob_measure(fruits);
+    std::cout << "Sampling a fruit: " << *uniform_fruits() << std::endl;
+    std::cout << "Sampling another fruit: " << *uniform_fruits() << std::endl;
+
+    auto uniform_empty = uniform_prob_measure(empty_vec);
+    auto result = uniform_empty();
+    std::cout << "Sampling from empty vector: "
+              << (result.has_value() ? *result : "nullopt") << std::endl;
+    std::cout << "\n---------------------------------\n\n";
+
+    // === Example 2: Scaled Distribution ===
+    std::cout << "## Scaled Distribution Example ##\n";
+    auto uniform_numbers = uniform_prob_measure(numbers);
+    auto scaled_numbers = scale_prob_measure(0.5, uniform_numbers);
+    int successes = 0;
+    int trials = 20;
+    std::cout << "Sampling 20 times from a measure scaled by 0.5:\n";
+    for (int i = 0; i < trials; ++i) {
+        if (auto num = scaled_numbers()) {
+            std::cout << *num << " ";
+            successes++;
+        }
     }
-  }
+    std::cout << "\nSucceeded " << successes << "/" << trials << " times.\n";
+    std::cout << "\n---------------------------------\n\n";
 
-  fg = std::make_unique<ArjunNS::FGenMpz>();
-  appmc = new ApproxMC::AppMC(fg);
-  unigen = new UniG(appmc);
-  simp_conf.appmc = true;
-  simp_conf.oracle_sparsify = false;
-  simp_conf.iter1 = 2;
-  simp_conf.iter2 = 0;
-  etof_conf.do_bce = false;
-  etof_conf.do_extend_indep = false;
-  parse_supported_options(argc, argv);
-  if (verb) {
-    print_version();
-    cout << "c o executed with command line: " << command_line << endl;
-  }
+    // === Example 3: Kleisli Composition (>>=) ===
+    std::cout << "## Kleisli Composition Example ##\n";
+    // A measure that uniformly picks one of two vectors
+    std::vector<std::vector<int>> number_groups = {{1, 2, 3}, {100, 200}};
+    auto pick_a_group = uniform_prob_measure(number_groups);
 
-  appmc->set_verbosity(verb);
-  appmc->set_seed(seed);
-  appmc->set_reuse_models(reuse_models);
-  appmc->set_sparse(sparse);
-  appmc->set_simplify(simplify);
-  appmc->set_var_elim_ratio(var_elim_ratio);
-  vector<uint32_t> sampling_vars_orig;
+    // A function that takes a vector and returns a measure over its elements
+    auto pick_from_group = [](const std::vector<int>& group) {
+        return uniform_prob_measure(group);
+    };
 
-  const auto& files = program.get<std::vector<std::string>>("inputfile");
-  if (files.empty()) {
-    cout << "ERROR: you provided --inputfile but no file. Strange. Exiting. "
-         << endl;
-    exit(-1);
-  }
-  const string fname(files[0]);
-  ArjunNS::SimplifiedCNF cnf(fg);
-  if (do_arjun) {
-    parse_file(fname, &cnf);
-    sampling_vars_orig = cnf.sampl_vars;
-    const auto orig_sampl_vars = cnf.sampl_vars;
-    double my_time = cpuTime();
-    ArjunNS::Arjun arjun;
-    arjun.set_verb(verb);
-    arjun.set_or_gate_based(arjun_gates);
-    arjun.set_xor_gates_based(arjun_gates);
-    arjun.set_ite_gate_based(arjun_gates);
-    arjun.set_irreg_gate_based(arjun_gates);
-    arjun.standalone_minimize_indep(cnf, etof_conf.all_indep);
-    if (with_e) arjun.standalone_elim_to_file(cnf, etof_conf, simp_conf);
-    appmc->new_vars(cnf.nVars());
-    appmc->set_sampl_vars(cnf.sampl_vars);
-    for (const auto& c : cnf.clauses) appmc->add_clause(c);
-    for (const auto& c : cnf.red_clauses) appmc->add_red_clause(c);
-    appmc->set_multiplier_weight(cnf.multiplier_weight);
-    print_final_indep_set(cnf.sampl_vars, orig_sampl_vars.size());
-    cout << "c o [arjun] Arjun finished. T: " << (cpuTime() - my_time) << endl;
-  } else {
-    parse_file(fname, appmc);
-    sampling_vars_orig = appmc->get_sampl_vars();
-    print_final_indep_set(appmc->get_sampl_vars(),
-                          appmc->get_sampl_vars().size());
-  }
+    // Compose them: first pick a group, then pick a number from that group
+    auto pick_a_number_from_a_random_group = pick_a_group >>= pick_from_group;
 
-  auto sol_count_unig = appmc->count();
-  unigen->set_verbosity(verb);
-  unigen->set_verb_sampler_cls(verb_banning_cls);
-  unigen->set_kappa(kappa);
-  unigen->set_multisample(multisample);
-  unigen->set_full_sampling_vars(sampling_vars_orig);
-
-  void* myfile = &std::cout;
-  std::ofstream sample_out;
-  if (sample_fname != "") {
-    sample_out.open(sample_fname.c_str());
-    if (!sample_out.is_open()) {
-      cout << "[Sampler] Cannot open samples file '" << sample_fname
-           << "' for writing." << endl;
-      exit(-1);
+    std::cout << "Sampling from the composed measure:\n";
+    for (int i = 0; i < 10; ++i) {
+        std::cout << *pick_a_number_from_a_random_group() << " ";
     }
-    myfile = &sample_out;
-  }
-  unigen->set_callback(mycallback, myfile);
-  unigen->sample(&sol_count_unig, num_samples);
+    std::cout << std::endl;
 
-  delete unigen;
-  delete appmc;
-
-  return 0;
+    return 0;
 }
+
+// int main(int argc, char** argv) {
+// #if defined(__GNUC__) && defined(__linux__)
+//   feenableexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW);
+// #endif
+
+//   // Reconstruct the command line so we can emit it later if needed
+//   string command_line;
+//   for (int i = 0; i < argc; i++) {
+//     command_line += string(argv[i]);
+//     if (i + 1 < argc) {
+//       command_line += " ";
+//     }
+//   }
+
+//   fg = std::make_unique<ArjunNS::FGenMpz>();
+//   appmc = new ApproxMC::AppMC(fg);
+//   unigen = new UniG(appmc);
+//   simp_conf.appmc = true;
+//   simp_conf.oracle_sparsify = false;
+//   simp_conf.iter1 = 2;
+//   simp_conf.iter2 = 0;
+//   etof_conf.do_bce = false;
+//   etof_conf.do_extend_indep = false;
+//   parse_supported_options(argc, argv);
+//   if (verb) {
+//     print_version();
+//     cout << "c o executed with command line: " << command_line << endl;
+//   }
+
+//   appmc->set_verbosity(verb);
+//   appmc->set_seed(seed);
+//   appmc->set_reuse_models(reuse_models);
+//   appmc->set_sparse(sparse);
+//   appmc->set_simplify(simplify);
+//   appmc->set_var_elim_ratio(var_elim_ratio);
+//   vector<uint32_t> sampling_vars_orig;
+
+//   const auto& files = program.get<std::vector<std::string>>("inputfile");
+//   if (files.empty()) {
+//     cout << "ERROR: you provided --inputfile but no file. Strange. Exiting. "
+//          << endl;
+//     exit(-1);
+//   }
+//   const string fname(files[0]);
+//   ArjunNS::SimplifiedCNF cnf(fg);
+//   if (do_arjun) {
+//     parse_file(fname, &cnf);
+//     sampling_vars_orig = cnf.sampl_vars;
+//     const auto orig_sampl_vars = cnf.sampl_vars;
+//     double my_time = cpuTime();
+//     ArjunNS::Arjun arjun;
+//     arjun.set_verb(verb);
+//     arjun.set_or_gate_based(arjun_gates);
+//     arjun.set_xor_gates_based(arjun_gates);
+//     arjun.set_ite_gate_based(arjun_gates);
+//     arjun.set_irreg_gate_based(arjun_gates);
+//     arjun.standalone_minimize_indep(cnf, etof_conf.all_indep);
+//     if (with_e) arjun.standalone_elim_to_file(cnf, etof_conf, simp_conf);
+//     appmc->new_vars(cnf.nVars());
+//     appmc->set_sampl_vars(cnf.sampl_vars);
+//     for (const auto& c : cnf.clauses) appmc->add_clause(c);
+//     for (const auto& c : cnf.red_clauses) appmc->add_red_clause(c);
+//     appmc->set_multiplier_weight(cnf.multiplier_weight);
+//     print_final_indep_set(cnf.sampl_vars, orig_sampl_vars.size());
+//     cout << "c o [arjun] Arjun finished. T: " << (cpuTime() - my_time) << endl;
+//   } else {
+//     parse_file(fname, appmc);
+//     sampling_vars_orig = appmc->get_sampl_vars();
+//     print_final_indep_set(appmc->get_sampl_vars(),
+//                           appmc->get_sampl_vars().size());
+//   }
+
+//   auto sol_count_unig = appmc->count();
+//   unigen->set_verbosity(verb);
+//   unigen->set_verb_sampler_cls(verb_banning_cls);
+//   unigen->set_kappa(kappa);
+//   unigen->set_multisample(multisample);
+//   unigen->set_full_sampling_vars(sampling_vars_orig);
+
+//   void* myfile = &std::cout;
+//   std::ofstream sample_out;
+//   if (sample_fname != "") {
+//     sample_out.open(sample_fname.c_str());
+//     if (!sample_out.is_open()) {
+//       cout << "[Sampler] Cannot open samples file '" << sample_fname
+//            << "' for writing." << endl;
+//       exit(-1);
+//     }
+//     myfile = &sample_out;
+//   }
+//   unigen->set_callback(mycallback, myfile);
+//   unigen->sample(&sol_count_unig, num_samples);
+
+//   delete unigen;
+//   delete appmc;
+
+//   return 0;
+// }

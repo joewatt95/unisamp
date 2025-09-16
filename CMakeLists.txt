@@ -82,6 +82,7 @@ add_executable(unigen_static
   ${PROJECT_SOURCE_DIR}/src/main.cpp
   ${PROJECT_SOURCE_DIR}/src/sampler.cpp
   ${PROJECT_SOURCE_DIR}/src/unigen.cpp
+  ${PROJECT_SOURCE_DIR}/src/prob_measures.hpp
   ${CMAKE_CURRENT_BINARY_DIR}/src-unigen/GitSHA1.cpp
 )
 # target_link_libraries(unigen PRIVATE gmp zlib mpfr cereal armadillo ensmallen mlpack)
