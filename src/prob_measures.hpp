@@ -88,17 +88,13 @@ struct SubProbMeasure {
   auto scale(double scale) const {
     if (scale <= 0.0)
       return SubProbMeasure<A, Rng>{.run = [](Rng&) { return std::nullopt; }};
-
     if (scale >= 1.0) return *this;
 
     return SubProbMeasure<A, Rng>{
         .run = [scale, this_run = this->run](Rng& rng) -> std::optional<A> {
           std::bernoulli_distribution dist(scale);
-          if (dist(rng)) {
-            return this_run(rng);  // Sample from the original measure
-          } else {
-            return std::nullopt;  // Fail
-          }
+          // Sample from the original measure if the Bernoulli succeeds, else fail. 
+          return dist(rng) ? this_run(rng) : std::nullopt;
         }};
   }
 };
