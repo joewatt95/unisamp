@@ -16,11 +16,11 @@
  */
 template <typename A, typename Rng = std::mt19937>
 struct SubProbMeasure {
-  // The underlying sampler function type.
+  /// The underlying sampler function type.
   using Sampler = std::function<std::optional<A>(Rng&)>;
   const Sampler run;
 
-  // The type of the value produced by the measure.
+  /// The type of the value produced by the measure.
   using value_type = A;
 
   /**
