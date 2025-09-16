@@ -60,19 +60,46 @@ struct SubProbMeasure {
     // Deduce the output type B from the function f
     using B = typename decltype(f(std::declval<A>()))::value_type;
 
-    return SubProbMeasure<B, Rng> {
-      .run = [this_run = this->run,
-              f = std::forward<F>(f)](Rng& rng) -> std::optional<B> {
-        // 1. Run the first measure to get an optional<A>
-        if (auto opt_a = this_run(rng)) {
-          // 2. If it succeeds, apply f to get the next measure
-          // 3. Run the next measure with the same rng
-          return f(*opt_a)(rng);
-        }
-        // 4. If the first measure fails, the composition fails
-        return std::nullopt;
-      }
-    };
+    return SubProbMeasure<B, Rng>{
+        .run = [this_run = this->run,
+                f = std::forward<F>(f)](Rng& rng) -> std::optional<B> {
+          // 1. Run the first measure to get an optional<A>
+          if (auto opt_a = this_run(rng)) {
+            // 2. If it succeeds, apply f to get the next measure
+            // 3. Run the next measure with the same rng
+            return f(*opt_a)(rng);
+          }
+          // 4. If the first measure fails, the composition fails
+          return std::nullopt;
+        }};
+  }
+
+  /**
+   * @brief Returns a new measure by scaling this measure's probability.
+   *
+   * The new measure samples from this measure with a probability of `scale`.
+   * With probability `1 - scale`, it returns nullopt.
+   *
+   * @param scale A scaling factor in the interval [0, 1].
+   * - If scale <= 0, the resulting measure always returns nullopt.
+   * - If scale >= 1, the resulting measure is identical to this one.
+   * @return A new, scaled SubProbMeasure.
+   */
+  auto scale(double scale) const {
+    if (scale <= 0.0)
+      return SubProbMeasure<A, Rng>{.run = [](Rng&) { return std::nullopt; }};
+
+    if (scale >= 1.0) return *this;
+
+    return SubProbMeasure<A, Rng>{
+        .run = [scale, this_run = this->run](Rng& rng) -> std::optional<A> {
+          std::bernoulli_distribution dist(scale);
+          if (dist(rng)) {
+            return this_run(rng);  // Sample from the original measure
+          } else {
+            return std::nullopt;  // Fail
+          }
+        }};
   }
 };
 
@@ -99,37 +126,4 @@ auto uniform_prob_measure(Range range) {
         std::uniform_int_distribution<std::size_t> dist(0, size - 1);
         return *std::ranges::next(std::ranges::begin(r), dist(rng));
       }};
-}
-
-/**
- * @brief Transforms a measure by scaling its probability.
- *
- * Creates a new measure that samples from the input measure with a
- * probability of `scale`. With probability `1 - scale`, it returns nullopt.
- *
- * @tparam A The value type of the input measure.
- * @tparam Rng The RNG type.
- * @param scale A scaling factor in the interval [0, 1].
- * - If scale <= 0, the resulting measure always returns nullopt.
- * - If scale >= 1, the resulting measure is identical to the input.
- * @param prob_measure The input sub-probability measure to scale.
- * @return A new, scaled SubProbMeasure.
- */
-template <typename A, typename Rng>
-auto scale_prob_measure(double scale, SubProbMeasure<A, Rng> prob_measure) {
-  return SubProbMeasure<A, Rng>{.run = [scale, pm = std::move(prob_measure)](
-                                           Rng& rng) -> std::optional<A> {
-    if (scale <= 0.0) {
-      return std::nullopt;
-    }
-    if (scale >= 1.0) {
-      return pm(rng);
-    }
-    std::bernoulli_distribution dist(scale);
-    if (dist(rng)) {
-      return pm(rng);  // Sample from the original measure
-    } else {
-      return std::nullopt;  // Fail
-    }
-  }};
 }

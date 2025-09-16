@@ -289,7 +289,7 @@ int main() {
     // === Example 2: Scaled Distribution ===
     std::cout << "## Scaled Distribution Example ##\n";
     auto uniform_numbers = uniform_prob_measure(numbers);
-    auto scaled_numbers = scale_prob_measure(0.5, uniform_numbers);
+    auto scaled_numbers = uniform_numbers.scale(0.5);
     int successes = 0;
     int trials = 20;
     std::cout << "Sampling 20 times from a measure scaled by 0.5:\n";
