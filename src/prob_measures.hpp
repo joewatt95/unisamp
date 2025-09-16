@@ -16,11 +16,11 @@
  */
 template <typename A, typename Rng = std::mt19937>
 struct SubProbMeasure {
-  /// The underlying sampler function type.
+  // The underlying sampler function type.
   using Sampler = std::function<std::optional<A>(Rng&)>;
-  Sampler run;
+  const Sampler run;
 
-  /// The type of the value produced by the measure.
+  // The type of the value produced by the measure.
   using value_type = A;
 
   /**
@@ -95,7 +95,7 @@ auto uniform_prob_measure(Range range) {
         if (std::ranges::empty(r)) {
           return std::nullopt;
         }
-        auto size = std::ranges::distance(r);
+        const auto size = std::ranges::distance(r);
         std::uniform_int_distribution<std::size_t> dist(0, size - 1);
         return *std::ranges::next(std::ranges::begin(r), dist(rng));
       }};
