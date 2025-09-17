@@ -75,6 +75,12 @@ endforeach()
 
 project(unigen)
 
+enable_language(CXX)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
@@ -90,12 +96,6 @@ add_executable(unigen_static
 target_link_libraries(unigen_static PRIVATE
   ZLIB::ZLIB cryptominisat5 approxmc arjun
 )
-
-enable_language(CXX)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # contains some library search cmake scripts
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
