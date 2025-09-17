@@ -24,7 +24,7 @@ auto bernoulli(double p) noexcept;
  * @brief Represents sub-probability measures as a failable, context-dependent
  * computation.
  *
- * This struct models the `MaybeT Reader` monad transformer. It encapsulates a
+ * This class models the `MaybeT Reader` monad transformer. It encapsulates a
  * function that depends on a shared environment (the random number generator
  * `Rng`) which it can mutate, and which may fail to produce a value
  * (`std::optional`). The wrapped function signature is `Rng& ->
