@@ -40,6 +40,7 @@
 #include <iostream>
 #include <numeric>  // For std::accumulate
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -334,8 +335,8 @@ int main() {
       return sub_prob_measures::uniform_range(category);
     };
 
-    // 3. Chain them with and_then (>>=): first pick a category, then pick an item
-    // from it
+    // 3. Chain them with and_then (>>=): first pick a category, then pick an
+    // item from it
     auto pick_random_item = pick_category.and_then(pick_item_from);
 
     std::cout << "Picking a random item from a random category...\n";
@@ -348,7 +349,8 @@ int main() {
   // --- Example 4: Scaling a Measure's Probability (`scale`) ---
   std::cout << "## 4. Scaling a Measure's Probability (`scale`) ##\n";
   {
-    auto measure = sub_prob_measures::pure(42);  // A measure that always produces 42
+    auto measure =
+        sub_prob_measures::pure(42);  // A measure that always produces 42
 
     // Scale it so it only succeeds with a 20% probability
     auto scaled_measure = measure.scale(0.2);
@@ -364,6 +366,32 @@ int main() {
               << trials << " times.\n";
   }
   std::cout << "\n" << std::string(40, '-') << "\n\n";
+
+  // --- Example 5: Sampling from a Single-Pass Range ---
+  // std::cout << "## 5. Sampling from a Single-Pass Range ##\n";
+  // {
+  //   // Create a stringstream to simulate a single-pass data source.
+  //   std::stringstream number_stream("10 20 30 40 50 60 70 80 90 100");
+
+  //   // Create an istream_view, which is a true single-pass input_range.
+  //   // It can only be iterated over once.
+  //   auto single_pass_numbers = std::ranges::istream_view<int>(number_stream);
+
+  //   // Create a measure from this single-pass range.
+  //   // This will use the specialized implementation of uniform_range that
+  //   // employs Algorithm L for Reservoir Sampling via the gfold_m primitive.
+  //   auto sample_from_stream =
+  //       sub_prob_measures::uniform_range(single_pass_numbers);
+
+  //   std::cout
+  //       << "Sampling from a single-pass stream (will consume the stream)...\n";
+  //   auto result = sample_from_stream();
+  //   std::cout << "  - Sampled value: " << *result << std::endl;
+
+  //   // Note: Because the stream is single-pass, it is now exhausted.
+  //   // A second call to the *same measure object* would not re-read the stream.
+  // }
+  // std::cout << "\n" << std::string(40, '-') << "\n\n";
 
   return 0;
 }
