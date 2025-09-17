@@ -348,7 +348,7 @@ int main() {
   // --- Example 4: Scaling a Measure's Probability (`scale`) ---
   std::cout << "## 4. Scaling a Measure's Probability (`scale`) ##\n";
   {
-    auto measure = sub_prob_measures::of(42);  // A measure that always produces 42
+    auto measure = sub_prob_measures::pure(42);  // A measure that always produces 42
 
     // Scale it so it only succeeds with a 20% probability
     auto scaled_measure = measure.scale(0.2);

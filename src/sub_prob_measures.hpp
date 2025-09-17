@@ -29,8 +29,8 @@ using RngDefault = std::mt19937;
  * This class is modelled after the `MaybeT Reader` monad transformer.
  * It encapsulates a function that depends on a shared environment (the random
  * number generator `Rng`) which:
- * 1. Can be any possibly stateful function, so that for a seeded random number
- * generator, the computation is deterministic.
+ * 1. Can be any possibly stateful function. Note that for a seeded random
+ * number generator, the computation is deterministic.
  * 2. May fail to produce a value (`std::optional`).
  * The wrapped function signature is `Rng& -> std::optional<A>`.
  *
@@ -39,12 +39,8 @@ using RngDefault = std::mt19937;
  */
 template <typename A, typename SamplerFunc, typename Rng = RngDefault>
 class SubProbMeasure {
-  /// The underlying sampler function type.
-  // using Sampler = std::function<std::optional<A>(Rng&)>;
-  // const Sampler run;
-
  private:
-  SamplerFunc run;
+  const SamplerFunc _sampler;
 
  public:
   /// The type of the value produced by the measure.
@@ -54,8 +50,8 @@ class SubProbMeasure {
    * @brief Constructs a SubProbMeasure from a callable sampler.
    * @param sampler The callable object that implements the sampling logic.
    */
-  constexpr explicit SubProbMeasure(SamplerFunc&& sampler) noexcept
-      : run(std::move(sampler)) {}
+  constexpr explicit SubProbMeasure(const SamplerFunc&& sampler) noexcept
+      : _sampler(std::move(sampler)) {}
 
   /**
    * @brief Executes the probabilistic computation with a provided RNG.
@@ -63,7 +59,7 @@ class SubProbMeasure {
    * @return An optional containing the sampled value, or nullopt on failure.
    */
   constexpr std::optional<A> operator()(Rng& rng) const noexcept {
-    return run(rng);
+    return this->_sampler(rng);
   }
 
   /**
@@ -97,7 +93,7 @@ class SubProbMeasure {
   constexpr auto and_then(F&& f) const noexcept {
     using B = typename decltype(f(std::declval<A>()))::value_type;
 
-    const auto new_sampler = [sampler = this->run, f = std::forward<F>(f)](
+    const auto new_sampler = [sampler = this->_sampler, f = std::forward<F>(f)](
                                  Rng& rng) noexcept -> std::optional<B> {
       return sampler(rng).and_then(
           [&](const A a) noexcept { return f(std::move(a))(rng); });
@@ -118,10 +114,10 @@ class SubProbMeasure {
   constexpr auto transform(F&& f) const noexcept {
     using B = decltype(f(std::declval<A>()));
 
-    const auto new_sampler = [this_run = this->run, f = std::forward<F>(f)](
+    const auto new_sampler = [sampler = this->_sampler, f = std::forward<F>(f)](
                                  Rng& rng) noexcept -> std::optional<B> {
       // Run the original measure and then transform its optional result.
-      return this_run(rng).transform(f);
+      return sampler(rng).transform(f);
     };
 
     return SubProbMeasure<B, decltype(new_sampler), Rng>(
@@ -160,7 +156,7 @@ class SubProbMeasure {
  * @return A deterministic SubProbMeasure.
  */
 template <typename A, typename Rng = RngDefault>
-constexpr auto of(const A value) noexcept {
+constexpr auto pure(const A value) noexcept {
   const auto sampler =
       [v = std::move(value)](Rng& /*rng*/) noexcept -> std::optional<A> {
     return v;
