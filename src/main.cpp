@@ -309,8 +309,8 @@ int main() {
       return "Normal Roll. (" + std::to_string(roll) + ")";
     };
 
-    // 3. Use `map` to create a new measure that produces a string
-    auto described_roll_measure = roll_d20.map(describe_roll);
+    // 3. Use `transform` to create a new measure that produces a string
+    auto described_roll_measure = roll_d20.transform(describe_roll);
 
     std::cout << "Executing the transformed measure: "
               << *described_roll_measure() << std::endl;
@@ -334,9 +334,9 @@ int main() {
       return sub_prob_measures::uniform_range(category);
     };
 
-    // 3. Chain them with bind (>>=): first pick a category, then pick an item
+    // 3. Chain them with and_then (>>=): first pick a category, then pick an item
     // from it
-    auto pick_random_item = pick_category >>= pick_item_from;
+    auto pick_random_item = pick_category.and_then(pick_item_from);
 
     std::cout << "Picking a random item from a random category...\n";
     for (int i = 0; i < 5; ++i) {
@@ -348,7 +348,7 @@ int main() {
   // --- Example 4: Scaling a Measure's Probability (`scale`) ---
   std::cout << "## 4. Scaling a Measure's Probability (`scale`) ##\n";
   {
-    auto measure = sub_prob_measures::pure(42);  // A measure that always produces 42
+    auto measure = sub_prob_measures::of(42);  // A measure that always produces 42
 
     // Scale it so it only succeeds with a 20% probability
     auto scaled_measure = measure.scale(0.2);

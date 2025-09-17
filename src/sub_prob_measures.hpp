@@ -9,31 +9,35 @@ namespace sub_prob_measures {
 
 // Forward declarations for factory functions
 template <typename A, typename Rng>
-constexpr auto pure(A value) noexcept;
+constexpr auto of(const A value) noexcept;
 
 template <typename A, typename Rng>
 constexpr auto fail() noexcept;
 
 template <typename Rng>
-constexpr auto guard(bool condition) noexcept;
+constexpr auto guard(const bool condition) noexcept;
 
 template <typename Rng>
-auto bernoulli(double p) noexcept;
+auto bernoulli(const double p) noexcept;
+
+using RngDefault = std::mt19937;
 
 /**
  * @brief Represents sub-probability measures as a failable, context-dependent
  * computation.
  *
- * This class models the `MaybeT Reader` monad transformer. It encapsulates a
- * function that depends on a shared environment (the random number generator
- * `Rng`) which it can mutate, and which may fail to produce a value
- * (`std::optional`). The wrapped function signature is `Rng& ->
- * std::optional<A>`.
+ * This class is modelled after the `MaybeT Reader` monad transformer.
+ * It encapsulates a function that depends on a shared environment (the random
+ * number generator `Rng`) which:
+ * 1. Can be any possibly stateful function, so that for a seeded random number
+ * generator, the computation is deterministic.
+ * 2. May fail to produce a value (`std::optional`).
+ * The wrapped function signature is `Rng& -> std::optional<A>`.
  *
  * @tparam A The type of the value to be sampled.
  * @tparam Rng The type of the random number generator (e.g., std::mt19937).
  */
-template <typename A, typename SamplerFunc, typename Rng = std::mt19937>
+template <typename A, typename SamplerFunc, typename Rng = RngDefault>
 class SubProbMeasure {
   /// The underlying sampler function type.
   // using Sampler = std::function<std::optional<A>(Rng&)>;
@@ -90,13 +94,13 @@ class SubProbMeasure {
    * @return A new SubProbMeasure representing the composed computation.
    */
   template <typename F>
-  constexpr auto operator>>=(F&& f) const noexcept {
+  constexpr auto and_then(F&& f) const noexcept {
     using B = typename decltype(f(std::declval<A>()))::value_type;
 
     const auto new_sampler = [sampler = this->run, f = std::forward<F>(f)](
                                  Rng& rng) noexcept -> std::optional<B> {
-      if (const auto opt_a = sampler(rng)) return f(*opt_a)(rng);
-      return std::nullopt;
+      return sampler(rng).and_then(
+          [&](const A a) noexcept { return f(std::move(a))(rng); });
     };
     return SubProbMeasure<B, decltype(new_sampler), Rng>(
         std::move(new_sampler));
@@ -111,7 +115,7 @@ class SubProbMeasure {
    * @return A new `SubProbMeasure` with a transformed result value.
    */
   template <typename F>
-  constexpr auto map(F&& f) const noexcept {
+  constexpr auto transform(F&& f) const noexcept {
     using B = decltype(f(std::declval<A>()));
 
     const auto new_sampler = [this_run = this->run, f = std::forward<F>(f)](
@@ -139,10 +143,11 @@ class SubProbMeasure {
     // returned false.
     // 3. If the monadic guard passes, bind its trivial result to a continuation
     // that returns the original measure.
-    return (bernoulli<Rng>(factor) >>= &guard<Rng>) >>=
-           [this_measure = *this](const std::monostate&) noexcept {
-             return this_measure;
-           };
+    return bernoulli<Rng>(factor)
+        .and_then(&guard<Rng>)
+        .and_then([this_measure = *this](const std::monostate&) noexcept {
+          return this_measure;
+        });
   }
 };
 
@@ -154,8 +159,8 @@ class SubProbMeasure {
  * @param value The value to lift.
  * @return A deterministic SubProbMeasure.
  */
-template <typename A, typename Rng = std::mt19937>
-constexpr auto pure(A value) noexcept {
+template <typename A, typename Rng = RngDefault>
+constexpr auto of(const A value) noexcept {
   const auto sampler =
       [v = std::move(value)](Rng& /*rng*/) noexcept -> std::optional<A> {
     return v;
@@ -167,7 +172,7 @@ constexpr auto pure(A value) noexcept {
  * @brief Creates a measure that always fails.
  * @return A `SubProbMeasure` that always yields `std::nullopt`.
  */
-template <typename A, typename Rng = std::mt19937>
+template <typename A, typename Rng = RngDefault>
 constexpr auto fail() noexcept {
   const auto sampler = [](Rng& /*rng*/) noexcept -> std::optional<A> {
     return std::nullopt;
@@ -189,8 +194,8 @@ constexpr auto fail() noexcept {
  * @return A `SubProbMeasure` that succeeds with a trivial value if
  * `condition` is true, and fails otherwise.
  */
-template <typename Rng = std::mt19937>
-constexpr auto guard(bool condition) noexcept {
+template <typename Rng = RngDefault>
+constexpr auto guard(const bool condition) noexcept {
   const auto sampler =
       [condition](Rng& /*rng*/) noexcept -> std::optional<std::monostate> {
     return condition ? std::optional(std::monostate{}) : std::nullopt;
@@ -204,8 +209,8 @@ constexpr auto guard(bool condition) noexcept {
  * @param p The probability of success (true).
  * @return A SubProbMeasure that samples a boolean value.
  */
-template <typename Rng = std::mt19937>
-auto bernoulli(double p) noexcept {
+template <typename Rng = RngDefault>
+auto bernoulli(const double p) noexcept {
   const auto sampler = [p](Rng& rng) noexcept -> std::optional<bool> {
     // Clamp probability to the valid [0, 1] range to prevent exceptions
     std::bernoulli_distribution dist(std::max(0.0, std::min(1.0, p)));
@@ -220,8 +225,8 @@ auto bernoulli(double p) noexcept {
  * @param max The inclusive upper bound of the range.
  * @return A measure that produces an `IntType`.
  */
-template <std::integral IntType = int, typename Rng = std::mt19937>
-auto uniform_int(IntType min, IntType max) noexcept {
+template <std::integral IntType = int, typename Rng = RngDefault>
+auto uniform_int(const IntType min, const IntType max) noexcept {
   const auto sampler = [min, max](Rng& rng) noexcept -> std::optional<IntType> {
     if (min > max) return std::nullopt;
     std::uniform_int_distribution<IntType> dist(min, max);
@@ -235,7 +240,7 @@ auto uniform_int(IntType min, IntType max) noexcept {
  * @param range The range of elements to sample from.
  * @return A measure that samples one element uniformly from the range.
  */
-template <std::ranges::forward_range Range, typename Rng = std::mt19937>
+template <std::ranges::forward_range Range, typename Rng = RngDefault>
 auto uniform_range(Range range) noexcept {
   using T = std::ranges::range_value_t<Range>;
 
