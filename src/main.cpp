@@ -43,7 +43,7 @@
 #include <string>
 #include <vector>
 
-#include "prob_measures.hpp"
+#include "sub_prob_measures.hpp"
 #include "time_mem.h"
 #include "unigen.h"
 
@@ -274,24 +274,21 @@ void check_sanity_sampling_vars(T vars, const uint32_t nvars) {
 }
 
 int main() {
-  // Define a type alias for our specific Rng for convenience
-  using Rng = std::mt19937;
-
   // --- Example 1: Basic Sampling and Failure ---
   std::cout << "## 1. Basic Sampling & Failure ##\n";
   {
-    using StringMeasure = SubProbMeasure<std::string, Rng>;
+    // using StringMeasure = SubProbMeasure<std::string, std::string, Rng>;
     std::vector<std::string> planets = {"Mercury", "Venus", "Earth", "Mars"};
     std::vector<std::string> empty = {};
 
     // Create a measure that samples uniformly from the 'planets' vector
-    auto pick_planet = StringMeasure::uniform_range(planets);
+    auto pick_planet = sub_prob_measures::uniform_range(planets);
 
     std::cout << "Sampling a planet: " << *pick_planet() << std::endl;
     std::cout << "Sampling another planet: " << *pick_planet() << std::endl;
 
     // Create a measure from an empty vector, which will always fail
-    auto pick_from_empty = StringMeasure::uniform_range(empty);
+    auto pick_from_empty = sub_prob_measures::uniform_range(empty);
     if (!pick_from_empty()) {
       std::cout << "Sampling from an empty vector correctly resulted in "
                    "failure (nullopt).\n";
@@ -302,10 +299,8 @@ int main() {
   // --- Example 2: Transforming a Result (`map`) ---
   std::cout << "## 2. Transforming a Result (`map`) ##\n";
   {
-    using IntMeasure = SubProbMeasure<int, Rng>;
-
     // 1. Start with a measure that produces an integer (a d20 roll)
-    auto roll_d20 = IntMeasure::uniform_int(1, 20);
+    auto roll_d20 = sub_prob_measures::uniform_int(1, 20);
 
     // 2. Define a pure function to transform the integer into a string
     auto describe_roll = [](int roll) {
@@ -331,14 +326,12 @@ int main() {
     std::vector<std::vector<std::string>> categories = {tools, fruits};
 
     // 1. First measure: probabilistically pick a category (a vector of strings)
-    auto pick_category =
-        SubProbMeasure<std::vector<std::string>, Rng>::uniform_range(
-            categories);
+    auto pick_category = sub_prob_measures::uniform_range(categories);
 
     // 2. Second measure factory: a function that takes a category and creates a
     // measure to pick an item from it
     auto pick_item_from = [](const std::vector<std::string>& category) {
-      return SubProbMeasure<std::string, Rng>::uniform_range(category);
+      return sub_prob_measures::uniform_range(category);
     };
 
     // 3. Chain them with bind (>>=): first pick a category, then pick an item
@@ -355,8 +348,7 @@ int main() {
   // --- Example 4: Scaling a Measure's Probability (`scale`) ---
   std::cout << "## 4. Scaling a Measure's Probability (`scale`) ##\n";
   {
-    using IntMeasure = SubProbMeasure<int, Rng>;
-    auto measure = IntMeasure::pure(42);  // A measure that always produces 42
+    auto measure = sub_prob_measures::pure(42);  // A measure that always produces 42
 
     // Scale it so it only succeeds with a 20% probability
     auto scaled_measure = measure.scale(0.2);

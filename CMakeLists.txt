@@ -82,7 +82,7 @@ add_executable(unigen_static
   ${PROJECT_SOURCE_DIR}/src/main.cpp
   ${PROJECT_SOURCE_DIR}/src/sampler.cpp
   ${PROJECT_SOURCE_DIR}/src/unigen.cpp
-  ${PROJECT_SOURCE_DIR}/src/prob_measures.hpp
+  ${PROJECT_SOURCE_DIR}/src/sub_prob_measures.hpp
   ${CMAKE_CURRENT_BINARY_DIR}/src-unigen/GitSHA1.cpp
 )
 # target_link_libraries(unigen PRIVATE gmp zlib mpfr cereal armadillo ensmallen mlpack)
@@ -94,7 +94,7 @@ target_link_libraries(unigen_static PRIVATE
 enable_language(CXX)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # contains some library search cmake scripts

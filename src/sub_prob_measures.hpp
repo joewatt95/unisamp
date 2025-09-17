@@ -1,0 +1,257 @@
+#include <concepts>
+#include <functional>
+#include <iterator>
+#include <optional>
+#include <random>
+#include <ranges>
+
+namespace sub_prob_measures {
+
+// Forward declarations for factory functions
+template <typename A, typename Rng>
+constexpr auto pure(A value) noexcept;
+
+template <typename A, typename Rng>
+constexpr auto fail() noexcept;
+
+template <typename Rng>
+constexpr auto guard(bool condition) noexcept;
+
+template <typename Rng>
+auto bernoulli(double p) noexcept;
+
+/**
+ * @brief Represents sub-probability measures as a failable, context-dependent
+ * computation.
+ *
+ * This struct models the `MaybeT Reader` monad transformer. It encapsulates a
+ * function that depends on a shared environment (the random number generator
+ * `Rng`) which it can mutate, and which may fail to produce a value
+ * (`std::optional`). The wrapped function signature is `Rng& ->
+ * std::optional<A>`.
+ *
+ * @tparam A The type of the value to be sampled.
+ * @tparam Rng The type of the random number generator (e.g., std::mt19937).
+ */
+template <typename A, typename SamplerFunc, typename Rng = std::mt19937>
+class SubProbMeasure {
+  /// The underlying sampler function type.
+  // using Sampler = std::function<std::optional<A>(Rng&)>;
+  // const Sampler run;
+
+ private:
+  SamplerFunc run;
+
+ public:
+  /// The type of the value produced by the measure.
+  using value_type = A;
+
+  /**
+   * @brief Constructs a SubProbMeasure from a callable sampler.
+   * @param sampler The callable object that implements the sampling logic.
+   */
+  constexpr explicit SubProbMeasure(SamplerFunc&& sampler) noexcept
+      : run(std::move(sampler)) {}
+
+  /**
+   * @brief Executes the probabilistic computation with a provided RNG.
+   * @param rng A reference to the random number generator.
+   * @return An optional containing the sampled value, or nullopt on failure.
+   */
+  constexpr std::optional<A> operator()(Rng& rng) const noexcept {
+    return run(rng);
+  }
+
+  /**
+   * @brief Executes the computation using a default, thread-local RNG.
+   *
+   * If an RNG is not provided, this overload creates and uses a static,
+   * thread-local RNG, seeded with std::random_device.
+   * @return An optional containing the sampled value, or nullopt on failure.
+   */
+  std::optional<A> operator()() const noexcept {
+    static thread_local Rng default_rng{std::random_device{}()};
+    return (*this)(default_rng);
+  }
+
+  // --- Compositional Methods ---
+
+  /**
+   * @brief Implements Kleisli composition (monadic bind).
+   *
+   * Composes this measure with a function `f` that takes a value of type `A`
+   * and returns a new SubProbMeasure. The mathematical formulation is:
+   * (m >>= f) rng = match (m rng) with
+   * | None -> None
+   * | Some(a) -> (f a) rng
+   *
+   * @tparam F A callable type mapping A to SubProbMeasure<B, Rng>.
+   * @param f The function to compose with.
+   * @return A new SubProbMeasure representing the composed computation.
+   */
+  template <typename F>
+  constexpr auto operator>>=(F&& f) const noexcept {
+    using B = typename decltype(f(std::declval<A>()))::value_type;
+
+    const auto new_sampler = [sampler = this->run, f = std::forward<F>(f)](
+                                 Rng& rng) noexcept -> std::optional<B> {
+      if (const auto opt_a = sampler(rng)) return f(*opt_a)(rng);
+      return std::nullopt;
+    };
+    return SubProbMeasure<B, decltype(new_sampler), Rng>(
+        std::move(new_sampler));
+  }
+
+  /**
+   * @brief Implements functor map (fmap).
+   *
+   * Applies a pure function to the result of this measure.
+   *
+   * @param f A pure function of type `A -> B` to apply to the result.
+   * @return A new `SubProbMeasure` with a transformed result value.
+   */
+  template <typename F>
+  constexpr auto map(F&& f) const noexcept {
+    using B = decltype(f(std::declval<A>()));
+
+    const auto new_sampler = [this_run = this->run, f = std::forward<F>(f)](
+                                 Rng& rng) noexcept -> std::optional<B> {
+      // Run the original measure and then transform its optional result.
+      return this_run(rng).transform(f);
+    };
+
+    return SubProbMeasure<B, decltype(new_sampler), Rng>(
+        std::move(new_sampler));
+  }
+
+  /**
+   * @brief Returns a new measure by scaling this measure's probability.
+   * @param factor The scaling factor in the interval [0, 1].
+   * @return A new, scaled SubProbMeasure.
+   */
+  auto scale(const double factor) const noexcept {
+    // Handle edge cases directly for efficiency
+    // if (factor <= 0.0) return fail<A, Rng>();
+    // if (factor >= 1.0) return *this;
+
+    // 1. Run a Bernoulli trial.
+    // 2. Bind the boolean result to a monadic guard that fails if the trial
+    // returned false.
+    // 3. If the monadic guard passes, bind its trivial result to a continuation
+    // that returns the original measure.
+    return (bernoulli<Rng>(factor) >>= &guard<Rng>) >>=
+           [this_measure = *this](const std::monostate&) noexcept {
+             return this_measure;
+           };
+  }
+};
+
+/**
+ * @brief Lifts a pure value into a SubProbMeasure (monadic return).
+ *
+ * Creates a measure that always succeeds and returns the given value
+ * without consuming any randomness.
+ * @param value The value to lift.
+ * @return A deterministic SubProbMeasure.
+ */
+template <typename A, typename Rng = std::mt19937>
+constexpr auto pure(A value) noexcept {
+  const auto sampler =
+      [v = std::move(value)](Rng& /*rng*/) noexcept -> std::optional<A> {
+    return v;
+  };
+  return SubProbMeasure<A, decltype(sampler), Rng>(std::move(sampler));
+}
+
+/**
+ * @brief Creates a measure that always fails.
+ * @return A `SubProbMeasure` that always yields `std::nullopt`.
+ */
+template <typename A, typename Rng = std::mt19937>
+constexpr auto fail() noexcept {
+  const auto sampler = [](Rng& /*rng*/) noexcept -> std::optional<A> {
+    return std::nullopt;
+  };
+  return SubProbMeasure<A, decltype(sampler), Rng>(std::move(sampler));
+}
+
+/**
+ * @brief Creates a measure that fails if a boolean condition is false.
+ *
+ * This method acts as a monadic guard, a standard pattern in functional
+ * programming. It is useful for introducing conditional failure into a
+ * chain of computations. If the condition is true, the measure succeeds
+ * with a trivial `std::monostate` value, allowing the chain to proceed.
+ * If the condition is false, the measure fails, halting the chain.
+ *
+ * @param condition The boolean condition to check. The measure will fail if
+ * this evaluates to `false`.
+ * @return A `SubProbMeasure` that succeeds with a trivial value if
+ * `condition` is true, and fails otherwise.
+ */
+template <typename Rng = std::mt19937>
+constexpr auto guard(bool condition) noexcept {
+  const auto sampler =
+      [condition](Rng& /*rng*/) noexcept -> std::optional<std::monostate> {
+    return condition ? std::optional(std::monostate{}) : std::nullopt;
+  };
+  return SubProbMeasure<std::monostate, decltype(sampler), Rng>(
+      std::move(sampler));
+}
+
+/**
+ * @brief A primitive measure for a Bernoulli trial.
+ * @param p The probability of success (true).
+ * @return A SubProbMeasure that samples a boolean value.
+ */
+template <typename Rng = std::mt19937>
+auto bernoulli(double p) noexcept {
+  const auto sampler = [p](Rng& rng) noexcept -> std::optional<bool> {
+    // Clamp probability to the valid [0, 1] range to prevent exceptions
+    std::bernoulli_distribution dist(std::max(0.0, std::min(1.0, p)));
+    return dist(rng);
+  };
+  return SubProbMeasure<bool, decltype(sampler), Rng>(std::move(sampler));
+}
+
+/**
+ * @brief Creates a measure for a uniform integer distribution.
+ * @param min The inclusive lower bound of the range.
+ * @param max The inclusive upper bound of the range.
+ * @return A measure that produces an `IntType`.
+ */
+template <std::integral IntType = int, typename Rng = std::mt19937>
+auto uniform_int(IntType min, IntType max) noexcept {
+  const auto sampler = [min, max](Rng& rng) noexcept -> std::optional<IntType> {
+    if (min > max) return std::nullopt;
+    std::uniform_int_distribution<IntType> dist(min, max);
+    return dist(rng);
+  };
+  return SubProbMeasure<IntType, decltype(sampler), Rng>(std::move(sampler));
+}
+
+/**
+ * @brief Creates a uniform distribution measure from a multipass range.
+ * @param range The range of elements to sample from.
+ * @return A measure that samples one element uniformly from the range.
+ */
+template <std::ranges::forward_range Range, typename Rng = std::mt19937>
+auto uniform_range(Range range) noexcept {
+  using T = std::ranges::range_value_t<Range>;
+
+  // The conditional logic is now moved inside the lambda to ensure a single
+  // return type for the uniform_range function.
+  const auto sampler =
+      [r = std::move(range)](Rng& rng) noexcept -> std::optional<T> {
+    if (std::ranges::empty(r)) {
+      return std::nullopt;
+    }
+    size_t size = std::ranges::distance(r);
+    std::uniform_int_distribution<std::size_t> dist(0, size - 1);
+    return *std::ranges::next(std::ranges::begin(r), dist(rng));
+  };
+
+  return SubProbMeasure<T, decltype(sampler), Rng>(std::move(sampler));
+}
+
+}  // namespace sub_prob_measures

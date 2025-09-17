@@ -47,7 +47,7 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/GitSHA1.cpp.in"
 set(unigen_lib_files
   sampler.cpp
   unigen.cpp
-  prob_measures.hpp
+  sub_prob_measures.hpp
   ${CMAKE_CURRENT_BINARY_DIR}/GitSHA1.cpp
 )
 
