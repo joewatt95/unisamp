@@ -15,7 +15,7 @@ Hence, we tweak the build process to use these environment variables, which we
 set in our portfile.
 
 diff --git a/configure b/configure
-index f8f1457..17f2106 100755
+index cb7ca06..17f2106 100755
 --- a/configure
 +++ b/configure
 @@ -34,16 +34,13 @@ checkfile () {
@@ -73,7 +73,7 @@ index f8f1457..17f2106 100755
  msg "Compiling with '$COMPILE'"
  
  rm -f makefile
--sed -e "s/@COMPILE@/$COMPILE/" makefile.in | sed -e "s/@LINK@/$LINK/" > makefile
+-sed -e "s#@COMPILE@#$COMPILE#" makefile.in | sed -e "s/@LINK@/$LINK/" > makefile
 +sed -e "s|@COMPILE@|$COMPILE|" makefile.in | sed -e "s|@LINK@|$LINK|" > makefile
  
  msg "Generated 'makefile' (run 'make' to compile)"
