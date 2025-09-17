@@ -12,7 +12,7 @@ constexpr auto get_rng() noexcept;
 
 // Forward declarations for factory functions
 template <typename A, typename Rng>
-constexpr auto of(const A value) noexcept;
+constexpr auto pure(const A value) noexcept;
 
 template <typename A, typename Rng>
 constexpr auto fail() noexcept;
