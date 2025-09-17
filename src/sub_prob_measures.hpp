@@ -7,6 +7,9 @@
 
 namespace sub_prob_measures {
 
+template <typename Rng>
+constexpr auto get_rng() noexcept;
+
 // Forward declarations for factory functions
 template <typename A, typename Rng>
 constexpr auto of(const A value) noexcept;
@@ -26,7 +29,7 @@ using RngDefault = std::mt19937;
  * @brief Represents sub-probability measures as a failable, context-dependent
  * computation.
  *
- * This class is modelled after the `MaybeT Reader` monad transformer.
+ * This class is modelled after the `MaybeT Reader` monad transformer stack.
  * It encapsulates a function that depends on a shared environment (the random
  * number generator `Rng`) which:
  * 1. Can be any possibly stateful function. Note that for a seeded random
@@ -144,6 +147,28 @@ class SubProbMeasure {
 };
 
 /**
+ * @brief Creates a measure that yields the random number generator itself.
+ *
+ * This function is analogous to the `ask` function in a Reader monad. It
+ * creates a computation that, when run, provides access to the environment
+ * — in this case, the random number generator (`Rng`). This is useful for
+ * building more complex measures that need to inspect or directly manipulate
+ * the RNG within a monadic sequence.
+ *
+ * @tparam Rng The type of the random number generator.
+ * @return A `SubProbMeasure` that produces a reference to the current `Rng`.
+ */
+template <typename Rng = RngDefault>
+constexpr auto get_rng() noexcept {
+  const auto sampler =
+      [](Rng& rng) noexcept -> std::optional<std::reference_wrapper<Rng>> {
+    return std::ref(rng);
+  };
+  return SubProbMeasure<std::reference_wrapper<Rng>, decltype(sampler), Rng>(
+      std::move(sampler));
+}
+
+/**
  * @brief Lifts a pure value into a SubProbMeasure (monadic return).
  *
  * Creates a measure that always succeeds and returns the given value
@@ -203,15 +228,17 @@ constexpr auto guard(const bool condition) noexcept {
  */
 template <typename Rng = RngDefault>
 auto bernoulli(const double p) noexcept {
-  const auto sampler = [p](Rng& rng) noexcept -> std::optional<bool> {
-    // Clamp the input p to [0, 1] and handle the trivial cases directly for
-    // efficiency.
-    if (p <= 0.0) return false;
-    if (p >= 1.0) return true;
-    std::bernoulli_distribution dist(p);
-    return dist(rng);
-  };
-  return SubProbMeasure<bool, decltype(sampler), Rng>(std::move(sampler));
+  // Get the RNG, then transform it into a boolean result by applying the
+  // Bernoulli trial logic.
+  return get_rng<Rng>().transform(
+      [p](std::reference_wrapper<Rng> rng_ref) noexcept -> bool {
+        // Clamp the input p to [0, 1] and handle the trivial cases directly for
+        // efficiency.
+        if (p <= 0.0) return false;
+        if (p >= 1.0) return true;
+        std::bernoulli_distribution dist(p);
+        return dist(rng_ref.get());
+      });
 }
 
 /**
@@ -222,12 +249,17 @@ auto bernoulli(const double p) noexcept {
  */
 template <std::integral IntType = int, typename Rng = RngDefault>
 auto uniform_int(const IntType min, const IntType max) noexcept {
-  const auto sampler = [min, max](Rng& rng) noexcept -> std::optional<IntType> {
-    if (min > max) return std::nullopt;
-    std::uniform_int_distribution<IntType> dist(min, max);
-    return dist(rng);
-  };
-  return SubProbMeasure<IntType, decltype(sampler), Rng>(std::move(sampler));
+  // Use guard to handle the precondition, then chain the sampling logic.
+  return guard<Rng>(min <= max)
+      .and_then([min, max](const std::monostate&) noexcept {
+        // If the guard passes, get the RNG and perform the sampling.
+        return get_rng<Rng>().transform(
+            [min,
+             max](std::reference_wrapper<Rng> rng_ref) noexcept -> IntType {
+              std::uniform_int_distribution<IntType> dist(min, max);
+              return dist(rng_ref.get());
+            });
+      });
 }
 
 /**
@@ -236,22 +268,21 @@ auto uniform_int(const IntType min, const IntType max) noexcept {
  * @return A measure that samples one element uniformly from the range.
  */
 template <std::ranges::forward_range Range, typename Rng = RngDefault>
-auto uniform_range(Range range) noexcept {
+auto uniform_range(Range&& range) noexcept {
   using T = std::ranges::range_value_t<Range>;
 
-  // The conditional logic is now moved inside the lambda to ensure a single
-  // return type for the uniform_range function.
-  const auto sampler =
-      [r = std::move(range)](Rng& rng) noexcept -> std::optional<T> {
-    if (std::ranges::empty(r)) {
-      return std::nullopt;
-    }
-    size_t size = std::ranges::distance(r);
-    std::uniform_int_distribution<std::size_t> dist(0, size - 1);
-    return *std::ranges::next(std::ranges::begin(r), dist(rng));
-  };
-
-  return SubProbMeasure<T, decltype(sampler), Rng>(std::move(sampler));
+  // Check if the range is empty. If so, fail immediately.
+  return guard<Rng>(!std::ranges::empty(range))
+      .and_then(
+          [r = std::forward<Range>(range)](const std::monostate&) noexcept {
+            // If the guard passes, sample a uniform index and then select the
+            // element.
+            const auto size = std::ranges::distance(r);
+            return uniform_int<size_t, Rng>(0, size - 1)
+                .transform([r](size_t index) -> T {
+                  return *std::ranges::next(std::ranges::begin(r), index);
+                });
+          });
 }
 
 }  // namespace sub_prob_measures
