@@ -95,13 +95,17 @@ class SubProbMeasure {
    * @return A new SubProbMeasure representing the composed computation.
    */
   template <typename F>
-  constexpr auto and_then(F&& f) const noexcept {
+  constexpr auto and_then(F&& f) const
+      noexcept(noexcept(f(std::declval<A>()))) {
     using B = typename decltype(f(std::declval<A>()))::value_type;
 
-    const auto new_sampler = [sampler = this->_sampler, f = std::forward<F>(f)](
-                                 Rng& rng) noexcept -> std::optional<B> {
+    const auto new_sampler =
+        [sampler = this->_sampler, f = std::forward<F>(f)](Rng& rng) noexcept(
+            noexcept(f(std::declval<A>()))) -> std::optional<B> {
       return sampler(rng).and_then(
-          [&](const A a) noexcept { return f(std::move(a))(rng); });
+          [&](const A a) noexcept(noexcept(f(std::declval<A>()))) {
+            return f(std::move(a))(rng);
+          });
     };
     return SubProbMeasure<B, decltype(new_sampler), Rng>(
         std::move(new_sampler));
@@ -116,7 +120,8 @@ class SubProbMeasure {
    * @return A new `SubProbMeasure` with a transformed result value.
    */
   template <typename F>
-  constexpr auto transform(F&& f) const noexcept {
+  constexpr auto transform(F&& f) const
+      noexcept(noexcept(f(std::declval<A>()))) {
     using B = decltype(f(std::declval<A>()));
 
     const auto new_sampler = [sampler = this->_sampler, f = std::forward<F>(f)](
@@ -264,6 +269,16 @@ auto uniform_int(const IntType min, const IntType max) noexcept {
       });
 }
 
+// Helper variable template to determine if the fold_m factory is nothrow.
+// This checks if all captures into the sampler lambda are
+// nothrow-constructible.
+template <typename It, typename S, typename State, typename F>
+constexpr bool is_fold_m_factory_nothrow_v =
+    std::is_nothrow_constructible_v<It, It&> &&
+    std::is_nothrow_constructible_v<S, S&> &&
+    std::is_nothrow_move_constructible_v<State> &&
+    std::is_nothrow_constructible_v<std::decay_t<F>, F>;
+
 /**
  * @brief Performs a monadic fold over a range defined by iterators.
  *
@@ -286,21 +301,28 @@ auto uniform_int(const IntType min, const IntType max) noexcept {
  */
 template <std::input_iterator It, std::sentinel_for<It> S, typename State,
           typename F, typename Rng = RngDefault>
-auto fold_m(It begin, S end, State init, F&& f) {
-  const auto sampler =
-      [it = begin, end, init = std::move(init),
-       f = std::forward<F>(f)](Rng& rng) {
+auto fold_m(It begin, S end, State init,
+            F&& f) noexcept(is_fold_m_factory_nothrow_v<It, S, State, F>) {
+  // Define a constant for the noexcept condition of the step function to
+  // improve readability.
+  static constexpr bool is_step_nothrow =
+      noexcept(f(std::declval<State>(), std::declval<std::iter_value_t<It>>()));
+
+  const auto sampler = [it = begin, end, init = std::move(init),
+                        f = std::forward<F>(f)](
+                           Rng& rng) noexcept(is_step_nothrow) {
     auto loop =
         [&](this auto&& self, It current_it,
-            std::optional<State> current_state_opt) {
-      if (current_it == end || !current_state_opt.has_value()) {
-        return current_state_opt;  // Base case: end of range or failure.
-      }
+            std::optional<State> current_state_opt) noexcept(is_step_nothrow) {
+          if (current_it == end || !current_state_opt.has_value())
+            return current_state_opt;  // Base case: end of range or failure.
 
-      // Recursive step: compute next state and recurse. This is a tail call.
-      auto next_state_opt = f(std::move(*current_state_opt), *current_it)(rng);
-      return self(std::next(current_it), std::move(next_state_opt));
-    };
+          // Recursive step: compute next state and recurse. This is a tail
+          // call.
+          auto next_state_opt =
+              f(std::move(*current_state_opt), *current_it)(rng);
+          return self(std::next(current_it), std::move(next_state_opt));
+        };
     return loop(it, std::optional<State>(init));
   };
 
@@ -323,12 +345,13 @@ auto uniform_range(Range&& range) noexcept {
     const auto is_empty = std::ranges::empty(range);
     return guard<Rng>(!is_empty).and_then(
         [r = std::forward<Range>(range)](const std::monostate&) noexcept {
-          size_t size;
-          if constexpr (std::ranges::sized_range<Range>) {
-            size = std::ranges::size(r);
-          } else {
-            size = std::ranges::distance(r);
-          }
+          const size_t size = [&r] {
+            if constexpr (std::ranges::sized_range<Range>) {
+              return std::ranges::size(r);
+            } else {
+              return std::ranges::distance(r);
+            }
+          }();
           return uniform_int<size_t, Rng>(0, size - 1)
               .transform([r](size_t index) -> T {
                 return *std::ranges::next(std::ranges::begin(r), index);
