@@ -1,3 +1,5 @@
+#pragma once
+
 #include <concepts>
 #include <functional>
 #include <iterator>
@@ -263,26 +265,109 @@ auto uniform_int(const IntType min, const IntType max) noexcept {
 }
 
 /**
+ * @brief Performs a monadic fold over a range defined by iterators.
+ *
+ * `fold_m` is a powerful higher-order function that generalizes
+ * `std::accumulate`. It threads a state through a sequence of probabilistic
+ * computations. For each element in the range, it applies a function `f` that
+ * takes the current state and the element, and returns a *measure* that will
+ * produce the next state.
+ *
+ * @tparam It The type of the input iterator.
+ * @tparam S The type of the sentinel for the iterator.
+ * @tparam State The type of the state being accumulated.
+ * @tparam F The type of the step function. Must be callable with
+ * `(State, std::iter_value_t<It>)` and return a `SubProbMeasure<State, Rng>`.
+ * @param begin The beginning of the range to iterate over.
+ * @param end The end of the range.
+ * @param init The initial state.
+ * @param f The monadic step function.
+ * @return A `SubProbMeasure` that, when executed, will produce the final state.
+ */
+template <std::input_iterator It, std::sentinel_for<It> S, typename State,
+          typename F, typename Rng = RngDefault>
+auto fold_m(It begin, S end, State init, F&& f) {
+  const auto sampler =
+      [it = begin, end, init = std::move(init),
+       f = std::forward<F>(f)](Rng& rng) {
+    auto loop =
+        [&](this auto&& self, It current_it,
+            std::optional<State> current_state_opt) {
+      if (current_it == end || !current_state_opt.has_value()) {
+        return current_state_opt;  // Base case: end of range or failure.
+      }
+
+      // Recursive step: compute next state and recurse. This is a tail call.
+      auto next_state_opt = f(std::move(*current_state_opt), *current_it)(rng);
+      return self(std::next(current_it), std::move(next_state_opt));
+    };
+    return loop(it, std::optional<State>(init));
+  };
+
+  return SubProbMeasure<State, decltype(sampler), Rng>(std::move(sampler));
+}
+
+/**
  * @brief Creates a uniform distribution measure from a multipass range.
  * @param range The range of elements to sample from.
- * @return A measure that samples one element uniformly from the range.
+ * @return A measure that samples one element uniformly from the range. This
+ * function supports both single-pass input ranges and multi-pass forward
+ * ranges.
  */
-template <std::ranges::forward_range Range, typename Rng = RngDefault>
+template <std::ranges::input_range Range, typename Rng = RngDefault>
 auto uniform_range(Range&& range) noexcept {
   using T = std::ranges::range_value_t<Range>;
 
-  // Check if the range is empty. If so, fail immediately.
-  return guard<Rng>(!std::ranges::empty(range))
-      .and_then(
-          [r = std::forward<Range>(range)](const std::monostate&) noexcept {
-            // If the guard passes, sample a uniform index and then select the
-            // element.
-            const auto size = std::ranges::distance(r);
-            return uniform_int<size_t, Rng>(0, size - 1)
-                .transform([r](size_t index) -> T {
-                  return *std::ranges::next(std::ranges::begin(r), index);
-                });
+  if constexpr (std::ranges::forward_range<Range>) {
+    // More efficient path for forward ranges (multi-pass capable).
+    const auto is_empty = std::ranges::empty(range);
+    return guard<Rng>(!is_empty).and_then(
+        [r = std::forward<Range>(range)](const std::monostate&) noexcept {
+          size_t size;
+          if constexpr (std::ranges::sized_range<Range>) {
+            size = std::ranges::size(r);
+          } else {
+            size = std::ranges::distance(r);
+          }
+          return uniform_int<size_t, Rng>(0, size - 1)
+              .transform([r](size_t index) -> T {
+                return *std::ranges::next(std::ranges::begin(r), index);
+              });
+        });
+  } else {
+    // Path for input ranges (single-pass only) using monadic Reservoir
+    // Sampling.
+    auto it = std::ranges::begin(range);
+    const auto end = std::ranges::end(range);
+
+    if (it == end) return fail<T, Rng>();
+
+    // Define the state for our fold: the reservoir and the current index.
+    using FoldState = std::pair<T, size_t>;  // {reservoir, index}
+
+    // Define the step function for the monadic fold.
+    auto reservoir_step = [](FoldState state, T current_item) noexcept {
+      auto [reservoir, index] = std::move(state);
+      const double prob = 1.0 / static_cast<double>(index);
+
+      // Probabilistically decide whether to replace the reservoir.
+      return bernoulli<Rng>(prob).transform(
+          [reservoir = std::move(reservoir),
+           current_item = std::move(current_item),
+           index](bool replace) -> FoldState {
+            T next_reservoir =
+                replace ? std::move(current_item) : std::move(reservoir);
+            return {std::move(next_reservoir), index + 1};
           });
+    };
+
+    // The initial state is the first item and an index of 2.
+    FoldState initial_state = {*it, 2};
+    return fold_m<decltype(it), decltype(end), FoldState,
+                  decltype(reservoir_step), Rng>(
+               std::next(it), end, std::move(initial_state), reservoir_step)
+        .transform([](FoldState final_state) { return final_state.first; });
+  }
 }
 
 }  // namespace sub_prob_measures
