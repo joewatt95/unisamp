@@ -130,10 +130,6 @@ class SubProbMeasure {
    * @return A new, scaled SubProbMeasure.
    */
   auto scale(const double factor) const noexcept {
-    // Handle edge cases directly for efficiency
-    // if (factor <= 0.0) return fail<A, Rng>();
-    // if (factor >= 1.0) return *this;
-
     // 1. Run a Bernoulli trial.
     // 2. Bind the boolean result to a monadic guard that fails if the trial
     // returned false.
@@ -208,8 +204,11 @@ constexpr auto guard(const bool condition) noexcept {
 template <typename Rng = RngDefault>
 auto bernoulli(const double p) noexcept {
   const auto sampler = [p](Rng& rng) noexcept -> std::optional<bool> {
-    // Clamp probability to the valid [0, 1] range to prevent exceptions
-    std::bernoulli_distribution dist(std::max(0.0, std::min(1.0, p)));
+    // Clamp the input p to [0, 1] and handle the trivial cases directly for
+    // efficiency.
+    if (p <= 0.0) return false;
+    if (p >= 1.0) return true;
+    std::bernoulli_distribution dist(p);
     return dist(rng);
   };
   return SubProbMeasure<bool, decltype(sampler), Rng>(std::move(sampler));
