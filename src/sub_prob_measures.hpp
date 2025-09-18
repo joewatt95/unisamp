@@ -146,7 +146,7 @@ class SubProbMeasure {
     using B = decltype(f(std::declval<A>()));
 
     auto new_sampler = [sampler = this->_sampler, f = std::forward<F>(f)](
-                                 Rng& rng) mutable -> std::optional<B> {
+                           Rng& rng) mutable -> std::optional<B> {
       // Run the original measure and then transform its optional result.
       return sampler(rng).transform(f);
     };
@@ -394,43 +394,43 @@ auto uniform_range(Range&& range) {
       auto it = std::ranges::begin(range);
       const auto end = std::ranges::end(range);
 
-      if (it == end) return std::nullopt;
+      // Monadically handle the empty range case.
+      return guard<Rng>(it != end)(rng).and_then(
+          [&](const std::monostate&) {
+            T initial_reservoir = *it;
+            ++it;
+            // Monadically generate initial W value.
+            return uniform_real<double>(0.0, 1.0)(rng).and_then(
+                [&](double u) {
+                  // Simplified calculation for k = 1
+                  double w = std::exp(std::log(u));
 
-      T initial_reservoir = *it;
-      ++it;
-
-      // Monadically generate initial W value.
-      return uniform_real<double>(0.0, 1.0)(rng).and_then(
-          [&](double u) -> std::optional<T> {
-            // Simplified calculation for k = 1
-            double w = std::exp(std::log(u));
-
-            const auto loop = [&](this auto&& self, T current_reservoir,
-                                  double current_w) -> std::optional<T> {
-              // Monadically calculate how many elements to skip.
-              return uniform_real<double>(0.0, 1.0)(rng).and_then(
-                  [&](double skip_u) -> std::optional<T> {
-                    const auto num_to_skip = static_cast<long>(std::floor(
-                        std::log(skip_u) / std::log(1.0 - current_w)));
-                    std::ranges::advance(it, num_to_skip, end);
-
-                    if (it == end) return std::move(current_reservoir);
-
-                    T next_reservoir = *it;
-                    ++it;
-
-                    // Monadically update W for the next iteration and
-                    // recurse.
+                  const auto loop = [&](this auto&& self, T current_reservoir,
+                                        double current_w) -> std::optional<T> {
+                    // Monadically calculate how many elements to skip.
                     return uniform_real<double>(0.0, 1.0)(rng).and_then(
-                        [&](double next_u) -> std::optional<T> {
-                          double next_w =
-                              current_w * std::exp(std::log(next_u));
-                          return self(std::move(next_reservoir), next_w);
-                        });
-                  });
-            };
+                        [&](double skip_u) -> std::optional<T> {
+                          const auto num_to_skip = static_cast<long>(std::floor(
+                              std::log(skip_u) / std::log(1.0 - current_w)));
+                          std::ranges::advance(it, num_to_skip, end);
 
-            return loop(std::move(initial_reservoir), w);
+                          if (it == end) return std::move(current_reservoir);
+
+                          T next_reservoir = *it;
+                          ++it;
+
+                          // Monadically update W for the next iteration and
+                          // recurse.
+                          return uniform_real<double>(0.0, 1.0)(rng).and_then(
+                              [&](double next_u) {
+                                const double next_w =
+                                    current_w * std::exp(std::log(next_u));
+                                return self(std::move(next_reservoir), next_w);
+                              });
+                        });
+                  };
+                  return loop(std::move(initial_reservoir), w);
+                });
           });
     };
     return SubProbMeasure<T, decltype(sampler), Rng>(std::move(sampler));
