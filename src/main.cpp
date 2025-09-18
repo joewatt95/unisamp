@@ -38,7 +38,6 @@
 
 #include <fstream>
 #include <iostream>
-#include <numeric>  // For std::accumulate
 #include <set>
 #include <sstream>
 #include <string>
@@ -367,31 +366,34 @@ int main() {
   }
   std::cout << "\n" << std::string(40, '-') << "\n\n";
 
-  // --- Example 5: Sampling from a Single-Pass Range ---
-  // std::cout << "## 5. Sampling from a Single-Pass Range ##\n";
-  // {
-  //   // Create a stringstream to simulate a single-pass data source.
-  //   std::stringstream number_stream("10 20 30 40 50 60 70 80 90 100");
+  std::cout << "## 5. Monadic fold ##\n";
 
-  //   // Create an istream_view, which is a true single-pass input_range.
-  //   // It can only be iterated over once.
-  //   auto single_pass_numbers = std::ranges::istream_view<int>(number_stream);
+  std::istringstream input_stream("1 3 5 9 11");
+  auto number_stream = std::ranges::istream_view<int>(input_stream);
 
-  //   // Create a measure from this single-pass range.
-  //   // This will use the specialized implementation of uniform_range that
-  //   // employs Algorithm L for Reservoir Sampling via the gfold_m primitive.
-  //   auto sample_from_stream =
-  //       sub_prob_measures::uniform_range(single_pass_numbers);
+  // auto number_stream = {1, 3, 5, 8, 11};
 
-  //   std::cout
-  //       << "Sampling from a single-pass stream (will consume the stream)...\n";
-  //   auto result = sample_from_stream();
-  //   std::cout << "  - Sampled value: " << *result << std::endl;
+  auto process_number = [](int current_sum, int number) {
+    std::cout << "Processing number: " << number << "..." << std::endl;
+    return sub_prob_measures::guard(number % 2 != 0)
+        .transform([=](const std::monostate&) { return current_sum + number; });
+  };
 
-  //   // Note: Because the stream is single-pass, it is now exhausted.
-  //   // A second call to the *same measure object* would not re-read the stream.
-  // }
-  // std::cout << "\n" << std::string(40, '-') << "\n\n";
+  auto computation = sub_prob_measures::foldl_m(0, number_stream, process_number);
+
+  std::cout << "Starting the monadic fold over the integer stream..." << std::endl;
+  std::optional<long long> result = computation();
+
+  std::cout << "\n--- Computation Finished ---" << std::endl;
+  if (result) {
+    std::cout << "Success! The fold processed the entire stream." << std::endl;
+    std::cout << "Final sum of odd numbers: " << *result << std::endl;
+  } else {
+    std::cout << "Failure. The fold was terminated because an even number was "
+                 "encountered."
+              << std::endl;
+  }
+  std::cout << "\n" << std::string(40, '-') << "\n\n";
 
   return 0;
 }

@@ -23,7 +23,7 @@ template <typename Rng>
 constexpr auto guard(const bool condition) noexcept;
 
 template <typename Rng>
-auto bernoulli(const double p) noexcept;
+auto bernoulli(const double p);
 
 using RngDefault = std::mt19937;
 
@@ -31,11 +31,18 @@ using RngDefault = std::mt19937;
  * @brief Represents sub-probability measures as a failable, context-dependent
  * computation.
  *
+ * @details This class is conditionally copyable. If it contains a simple,
+ * copyable sampler, the object can be copied. If it contains a stateful,
+ * move-only sampler (e.g., from a single-pass range), the object becomes
+ * move-only.
  * This class is modelled after the `MaybeT Reader` monad transformer stack.
  * It encapsulates a function that depends on a shared environment (the random
  * number generator `Rng`) which:
- * 1. Can be any possibly stateful function. Note that for a seeded random
+ * 1. Can be any (likely stateful) function. Note that for a seeded random
  * number generator, the computation is deterministic.
+ * Technically, this is more like a MaybeT State than a MaybeT Reader, but
+ * we're abusing the fact that we're working in an imperative language, where
+ * the stateful function can mutate its internal state.
  * 2. May fail to produce a value (`std::optional`).
  * The wrapped function signature is `Rng& -> std::optional<A>`.
  *
@@ -45,7 +52,7 @@ using RngDefault = std::mt19937;
 template <typename A, typename SamplerFunc, typename Rng = RngDefault>
 class SubProbMeasure {
  private:
-  const SamplerFunc _sampler;
+  SamplerFunc _sampler;
 
  public:
   /// The type of the value produced by the measure.
@@ -55,16 +62,36 @@ class SubProbMeasure {
    * @brief Constructs a SubProbMeasure from a callable sampler.
    * @param sampler The callable object that implements the sampling logic.
    */
-  constexpr explicit SubProbMeasure(const SamplerFunc&& sampler) noexcept
+  constexpr explicit SubProbMeasure(SamplerFunc&& sampler)
       : _sampler(std::move(sampler)) {}
+
+  // --- Conditional Copy Semantics ---
+  constexpr SubProbMeasure(const SubProbMeasure& other) noexcept(
+      std::is_nothrow_copy_constructible_v<SamplerFunc>)
+    requires std::is_copy_constructible_v<SamplerFunc>
+      : _sampler(other._sampler) {}
+
+  constexpr SubProbMeasure& operator=(const SubProbMeasure& other) noexcept(
+      std::is_nothrow_copy_assignable_v<SamplerFunc>)
+    requires std::is_copy_constructible_v<SamplerFunc>
+  {
+    if (this != &other) _sampler = other._sampler;
+    return *this;
+  }
+
+  // --- Default Move Semantics ---
+  SubProbMeasure(SubProbMeasure&&) noexcept(
+      std::is_nothrow_move_constructible_v<SamplerFunc>) = default;
+  constexpr SubProbMeasure& operator=(SubProbMeasure&&) noexcept(
+      std::is_nothrow_move_assignable_v<SamplerFunc>) = default;
 
   /**
    * @brief Executes the probabilistic computation with a provided RNG.
    * @param rng A reference to the random number generator.
    * @return An optional containing the sampled value, or nullopt on failure.
    */
-  constexpr std::optional<A> operator()(Rng& rng) const
-      noexcept(noexcept(this->_sampler(rng))) {
+  constexpr std::optional<A> operator()(Rng& rng) noexcept(
+      noexcept(this->_sampler(rng))) {
     return this->_sampler(rng);
   }
 
@@ -76,7 +103,7 @@ class SubProbMeasure {
    * fails to acquire entropy to seed the default RNG.
    * @return An optional containing the sampled value, or nullopt on failure.
    */
-  std::optional<A> operator()() const {
+  std::optional<A> operator()() {
     static thread_local Rng default_rng{std::random_device{}()};
     return (*this)(default_rng);
   }
@@ -97,20 +124,30 @@ class SubProbMeasure {
    * @return A new SubProbMeasure representing the composed computation.
    */
   template <typename F>
-  constexpr auto and_then(F&& f) const
-      noexcept(noexcept(f(std::declval<A>()))) {
+  constexpr auto and_then(F&& f) && {
     using B = typename decltype(f(std::declval<A>()))::value_type;
 
     const auto new_sampler =
-        [sampler = this->_sampler, f = std::forward<F>(f)](Rng& rng) noexcept(
-            noexcept(f(std::declval<A>()))) -> std::optional<B> {
+        [sampler = std::move(this->_sampler), f = std::forward<F>(f)](
+            Rng& rng)
+        -> std::optional<B> {
       return sampler(rng).and_then(
-          [&](const A a) noexcept(noexcept(f(std::declval<A>()))) {
+          [&](const A a) {
             return f(std::move(a))(rng);
           });
     };
     return SubProbMeasure<B, decltype(new_sampler), Rng>(
         std::move(new_sampler));
+  }
+
+  /**
+   * @brief Overload for lvalues (if copyable). Preserves the original object.
+   */
+  template <typename F>
+  constexpr auto and_then(F&& f) const&
+    requires std::is_copy_constructible_v<SamplerFunc>
+  {
+    return SubProbMeasure(*this).and_then(std::forward<F>(f));
   }
 
   /**
@@ -122,8 +159,7 @@ class SubProbMeasure {
    * @return A new `SubProbMeasure` with a transformed result value.
    */
   template <typename F>
-  constexpr auto transform(F&& f) const
-      noexcept(noexcept(f(std::declval<A>()))) {
+  constexpr auto transform(F&& f) && {
     using B = decltype(f(std::declval<A>()));
 
     const auto new_sampler = [sampler = this->_sampler, f = std::forward<F>(f)](
@@ -136,12 +172,19 @@ class SubProbMeasure {
         std::move(new_sampler));
   }
 
+  template <typename F>
+  constexpr auto transform(F&& f) const&
+    requires std::is_copy_constructible_v<SamplerFunc>
+  {
+    return SubProbMeasure(*this).transform(std::forward<F>(f));
+  }
+
   /**
    * @brief Returns a new measure by scaling this measure's probability.
    * @param factor The scaling factor in the interval [0, 1].
    * @return A new, scaled SubProbMeasure.
    */
-  auto scale(const double factor) const noexcept {
+  auto scale(const double factor) && {
     // 1. Run a Bernoulli trial.
     // 2. Bind the boolean result to a monadic guard that fails if the trial
     // returned false.
@@ -152,6 +195,12 @@ class SubProbMeasure {
         .and_then([this_measure = *this](const std::monostate&) noexcept {
           return this_measure;
         });
+  }
+
+  auto scale(const double factor) const&
+    requires std::is_copy_constructible_v<SamplerFunc>
+  {
+    return SubProbMeasure(*this).scale(factor);
   }
 };
 
@@ -193,14 +242,6 @@ constexpr auto pure(A value) noexcept {
   };
   return SubProbMeasure<A, decltype(sampler), Rng>(std::move(sampler));
 }
-
-// constexpr auto pure(const A value) noexcept {
-//   const auto sampler =
-//       [v = std::move(value)](Rng& /*rng*/) noexcept -> std::optional<A> {
-//     return v;
-//   };
-//   return SubProbMeasure<A, decltype(sampler), Rng>(std::move(sampler));
-// }
 
 /**
  * @brief Creates a measure that always fails.
@@ -244,11 +285,11 @@ constexpr auto guard(const bool condition) noexcept {
  * @return A SubProbMeasure that samples a boolean value.
  */
 template <typename Rng = RngDefault>
-auto bernoulli(const double p) noexcept {
+auto bernoulli(const double p) {
   // Get the RNG, then transform it into a boolean result by applying the
   // Bernoulli trial logic.
   return get_rng<Rng>().transform(
-      [p](std::reference_wrapper<Rng> rng_ref) noexcept -> bool {
+      [p](std::reference_wrapper<Rng> rng_ref) -> bool {
         // Clamp the input p to [0, 1] and handle the trivial cases directly for
         // efficiency.
         if (p <= 0.0) return false;
@@ -260,7 +301,7 @@ auto bernoulli(const double p) noexcept {
 
 // Concept to check if Dist is a valid numeric distribution for NumType.
 template <template <typename> class Dist, typename NumType, typename Rng>
-concept NumericDistribution =
+concept NumericDist =
     (std::integral<NumType> || std::floating_point<NumType>) &&
     requires(Rng& rng, NumType val) {
       // Check that Dist<NumType> can be constructed and called
@@ -286,8 +327,8 @@ constexpr bool is_dist_call_nothrow_v =
  * @tparam Rng The random number generator type.
  */
 template <template <typename> class Dist, typename NumType, typename Rng>
-  requires NumericDistribution<Dist, NumType, Rng>
-auto numeric_dist(const NumType min, const NumType max) noexcept {
+  requires NumericDist<Dist, NumType, Rng>
+auto numeric_dist(const NumType min, const NumType max) {
   // Use guard to handle the precondition, then chain the sampling logic.
   return guard<Rng>(min <= max)
       .and_then([min, max](const std::monostate&) noexcept {
@@ -307,7 +348,7 @@ auto numeric_dist(const NumType min, const NumType max) noexcept {
  * @return A measure that produces an `IntType`.
  */
 template <std::integral IntType = int, typename Rng = RngDefault>
-auto uniform_int(const IntType min, const IntType max) noexcept {
+auto uniform_int(const IntType min, const IntType max) {
   return numeric_dist<std::uniform_int_distribution, IntType, Rng>(min, max);
 }
 
@@ -318,7 +359,7 @@ auto uniform_int(const IntType min, const IntType max) noexcept {
  * @return A measure that produces a `RealType`.
  */
 template <std::floating_point RealType = double, typename Rng = RngDefault>
-auto uniform_real(const RealType min, const RealType max) noexcept {
+auto uniform_real(const RealType min, const RealType max) {
   return numeric_dist<std::uniform_real_distribution, RealType, Rng>(min, max);
 }
 
@@ -342,14 +383,14 @@ auto uniform_real(const RealType min, const RealType max) noexcept {
  * @return A measure that samples one element uniformly from the range.
  */
 template <std::ranges::input_range Range, typename Rng = RngDefault>
-auto uniform_range(Range&& range) noexcept {
+auto uniform_range(Range&& range) {
   using T = std::ranges::range_value_t<Range>;
 
   if constexpr (std::ranges::forward_range<Range>) {
     // More efficient path for forward ranges (multi-pass capable).
     const auto is_empty = std::ranges::empty(range);
     return guard<Rng>(!is_empty).and_then(
-        [r = std::forward<Range>(range)](const std::monostate&) noexcept {
+        [r = std::forward<Range>(range)](const std::monostate&) {
           const size_t size = [&r] {
             if constexpr (std::ranges::sized_range<Range>) {
               return std::ranges::size(r);
@@ -370,6 +411,64 @@ auto uniform_range(Range&& range) noexcept {
     if (it == end) {
       return fail<T, Rng>();
     }
+  }
+}
+
+/**
+ * @brief Performs a monadic left fold over a range.
+ *
+ * This function iterates through a range, applying a monadic function `f` at
+ * each step. The function `f` takes the current accumulator and the current
+ * element, and returns a new `SubProbMeasure` containing the updated
+ * accumulator.
+ *
+ * The implementation uses a functional, tail-recursive lambda (using C++23's
+ * `deducing this`) to model the iteration. It uses `std::optional::and_then`
+ * to propagate failure monadically, avoiding explicit checks and maintaining a
+ * functional style. The structure is designed to allow for tail-call
+ * optimization by compilers.
+ *
+ * @tparam Range The type of the input range.
+ * @tparam B The type of the accumulator.
+ * @tparam F The type of the monadic function.
+ * @tparam Rng The type of the random number generator.
+ * @param init The initial value of the accumulator.
+ * @param range The range to fold over.
+ * @param f The monadic function of type `(B, A) -> SubProbMeasure<B, Rng>`.
+ * @return A `SubProbMeasure` representing the entire fold operation.
+ */
+template <std::ranges::input_range Range, typename B, typename F,
+          typename Rng = RngDefault>
+auto foldl_m(B init, Range&& range, F&& f) noexcept(
+    std::is_nothrow_invocable_v<F, B, std::ranges::range_reference_t<Range>>) {
+  // Helper to check if the folding function `f` is noexcept.
+  static constexpr bool is_f_nothrow =
+      noexcept(f(std::declval<B>(),
+                 std::declval<std::ranges::range_reference_t<Range>>()));
+
+  auto sampler =
+      [init = std::move(init), range = std::forward<Range>(range),
+       f = std::forward<F>(f)](
+          Rng& rng) mutable noexcept(is_f_nothrow) -> std::optional<B> {
+    auto it = std::ranges::begin(range);
+    auto end = std::ranges::end(range);
+
+    const auto loop = [&](this auto&& self, std::optional<B> acc) noexcept(
+                          is_f_nothrow) -> std::optional<B> {
+      // Base case: Terminate if the range is exhausted.
+      if (it == end) return acc;
+      // Monadically compute the next accumulator state.
+      // If 'acc' is nullopt, 'and_then' short-circuits and propagates it.
+      const auto next_acc =
+          acc.and_then([&](B next_acc_) noexcept(is_f_nothrow) {
+            return f(std::move(next_acc_), *it)(rng);
+          });
+      ++it;
+      return self(std::move(next_acc));
+    };
+    return loop(std::optional<B>(std::move(init)));
+  };
+  return SubProbMeasure<B, decltype(sampler), Rng>(std::move(sampler));
 }
 
 }  // namespace sub_prob_measures
