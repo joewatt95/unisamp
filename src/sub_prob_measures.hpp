@@ -359,8 +359,7 @@ auto uniform_real(const RealType min, const RealType max) {
  *     Sampling**. This advanced algorithm processes the stream in a single
  *     pass and is highly efficient for large streams because it can
  *     probabilistically calculate how many elements to skip, avoiding the need
- *     to process every single one. The implementation elegantly expresses this
- *     complex iteration pattern using the generalized monadic fold `gfold_m`.
+ *     to process every single one.
  *
  * @param range The range of elements to sample from.
  * @return A measure that samples one element uniformly from the range.
