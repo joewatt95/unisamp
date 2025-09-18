@@ -366,23 +366,33 @@ int main() {
   }
   std::cout << "\n" << std::string(40, '-') << "\n\n";
 
-  std::cout << "## 5. Monadic fold ##\n";
+  std::cout << "## 5. Input stream of numbers ##\n";
 
   std::istringstream input_stream("1 3 5 9 11");
   auto number_stream = std::ranges::istream_view<int>(input_stream);
 
   // auto number_stream = {1, 3, 5, 8, 11};
 
-  auto process_number = [](int current_sum, int number) {
-    std::cout << "Processing number: " << number << "..." << std::endl;
-    return sub_prob_measures::guard(number % 2 != 0)
-        .transform([=](const std::monostate&) { return current_sum + number; });
+  std::cout << "Uniformly sampling a number..." << std::endl;
+  sub_prob_measures::uniform_range(number_stream).transform([](int n) {
+    std::cout << "Sampled number: " << n << std::endl;
+    return n;
+  })();
+  // std::cout << "Sampled number: " << std::to_string(number.value()) << std::endl;
+
+  auto process_number = [](int current_sum, int n) {
+    std::cout << "Processing number: " << n << "..." << std::endl;
+    return sub_prob_measures::guard(n % 2 != 0)
+        .transform([=](const std::monostate&) { return current_sum + n; });
   };
 
-  auto computation = sub_prob_measures::foldl_m(0, number_stream, process_number);
+  std::istringstream input_stream_("1 3 5 9 11");
+  auto number_stream_ = std::ranges::istream_view<int>(input_stream_);
+
+  auto computation = sub_prob_measures::foldl_m(0, number_stream_, process_number);
 
   std::cout << "Starting the monadic fold over the integer stream..." << std::endl;
-  std::optional<long long> result = computation();
+  std::optional<int> result = computation();
 
   std::cout << "\n--- Computation Finished ---" << std::endl;
   if (result) {

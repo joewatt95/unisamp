@@ -65,25 +65,11 @@ class SubProbMeasure {
   constexpr explicit SubProbMeasure(SamplerFunc&& sampler)
       : _sampler(std::move(sampler)) {}
 
-  // --- Conditional Copy Semantics ---
-  constexpr SubProbMeasure(const SubProbMeasure& other) noexcept(
-      std::is_nothrow_copy_constructible_v<SamplerFunc>)
-    requires std::is_copy_constructible_v<SamplerFunc>
-      : _sampler(other._sampler) {}
-
-  constexpr SubProbMeasure& operator=(const SubProbMeasure& other) noexcept(
-      std::is_nothrow_copy_assignable_v<SamplerFunc>)
-    requires std::is_copy_constructible_v<SamplerFunc>
-  {
-    if (this != &other) _sampler = other._sampler;
-    return *this;
-  }
-
   // --- Default Move Semantics ---
-  SubProbMeasure(SubProbMeasure&&) noexcept(
-      std::is_nothrow_move_constructible_v<SamplerFunc>) = default;
-  constexpr SubProbMeasure& operator=(SubProbMeasure&&) noexcept(
-      std::is_nothrow_move_assignable_v<SamplerFunc>) = default;
+  // SubProbMeasure(const SubProbMeasure&) = default;
+  // SubProbMeasure& operator=(const SubProbMeasure&) = default;
+  // SubProbMeasure(SubProbMeasure&&) = default;
+  // SubProbMeasure& operator=(SubProbMeasure&&) = default;
 
   /**
    * @brief Executes the probabilistic computation with a provided RNG.
@@ -127,14 +113,11 @@ class SubProbMeasure {
   constexpr auto and_then(F&& f) && {
     using B = typename decltype(f(std::declval<A>()))::value_type;
 
-    const auto new_sampler =
-        [sampler = std::move(this->_sampler), f = std::forward<F>(f)](
-            Rng& rng)
-        -> std::optional<B> {
+    auto new_sampler =
+        [sampler = std::move(this->_sampler),
+         f = std::forward<F>(f)](Rng& rng) mutable -> std::optional<B> {
       return sampler(rng).and_then(
-          [&](const A a) {
-            return f(std::move(a))(rng);
-          });
+          [&](const A a) { return f(std::move(a))(rng); });
     };
     return SubProbMeasure<B, decltype(new_sampler), Rng>(
         std::move(new_sampler));
@@ -162,8 +145,8 @@ class SubProbMeasure {
   constexpr auto transform(F&& f) && {
     using B = decltype(f(std::declval<A>()));
 
-    const auto new_sampler = [sampler = this->_sampler, f = std::forward<F>(f)](
-                                 Rng& rng) noexcept -> std::optional<B> {
+    auto new_sampler = [sampler = this->_sampler, f = std::forward<F>(f)](
+                                 Rng& rng) mutable -> std::optional<B> {
       // Run the original measure and then transform its optional result.
       return sampler(rng).transform(f);
     };
@@ -406,11 +389,51 @@ auto uniform_range(Range&& range) {
   } else {
     // Path for input ranges (single-pass only), via Algorithm L for reservoir
     // sampling.
-    auto it = std::ranges::begin(range);
-    const auto end = std::ranges::end(range);
-    if (it == end) {
-      return fail<T, Rng>();
-    }
+    auto sampler = [range = std::forward<Range>(range)](
+                       Rng& rng) mutable -> std::optional<T> {
+      auto it = std::ranges::begin(range);
+      const auto end = std::ranges::end(range);
+
+      if (it == end) return std::nullopt;
+
+      T initial_reservoir = *it;
+      ++it;
+
+      // Monadically generate initial W value.
+      return uniform_real<double>(0.0, 1.0)(rng).and_then(
+          [&](double u) -> std::optional<T> {
+            // Simplified calculation for k = 1
+            double w = std::exp(std::log(u));
+
+            const auto loop = [&](this auto&& self, T current_reservoir,
+                                  double current_w) -> std::optional<T> {
+              // Monadically calculate how many elements to skip.
+              return uniform_real<double>(0.0, 1.0)(rng).and_then(
+                  [&](double skip_u) -> std::optional<T> {
+                    const auto num_to_skip = static_cast<long>(std::floor(
+                        std::log(skip_u) / std::log(1.0 - current_w)));
+                    std::ranges::advance(it, num_to_skip, end);
+
+                    if (it == end) return std::move(current_reservoir);
+
+                    T next_reservoir = *it;
+                    ++it;
+
+                    // Monadically update W for the next iteration and
+                    // recurse.
+                    return uniform_real<double>(0.0, 1.0)(rng).and_then(
+                        [&](double next_u) -> std::optional<T> {
+                          double next_w =
+                              current_w * std::exp(std::log(next_u));
+                          return self(std::move(next_reservoir), next_w);
+                        });
+                  });
+            };
+
+            return loop(std::move(initial_reservoir), w);
+          });
+    };
+    return SubProbMeasure<T, decltype(sampler), Rng>(std::move(sampler));
   }
 }
 
@@ -451,7 +474,7 @@ auto foldl_m(B init, Range&& range, F&& f) noexcept(
        f = std::forward<F>(f)](
           Rng& rng) mutable noexcept(is_f_nothrow) -> std::optional<B> {
     auto it = std::ranges::begin(range);
-    auto end = std::ranges::end(range);
+    const auto end = std::ranges::end(range);
 
     const auto loop = [&](this auto&& self, std::optional<B> acc) noexcept(
                           is_f_nothrow) -> std::optional<B> {
