@@ -43,7 +43,7 @@
 #include <string>
 #include <vector>
 
-#include "sub_prob_measures.hpp"
+#include "sub_prob_measure.hpp"
 #include "time_mem.h"
 #include "unigen.h"
 
@@ -282,13 +282,13 @@ int main() {
     std::vector<std::string> empty = {};
 
     // Create a measure that samples uniformly from the 'planets' vector
-    auto pick_planet = sub_prob_measures::uniform_range(planets);
+    auto pick_planet = sub_prob_measure::uniform_range(planets);
 
     std::cout << "Sampling a planet: " << *pick_planet() << std::endl;
     std::cout << "Sampling another planet: " << *pick_planet() << std::endl;
 
     // Create a measure from an empty vector, which will always fail
-    auto pick_from_empty = sub_prob_measures::uniform_range(empty);
+    auto pick_from_empty = sub_prob_measure::uniform_range(empty);
     if (!pick_from_empty()) {
       std::cout << "Sampling from an empty vector correctly resulted in "
                    "failure (nullopt).\n";
@@ -300,7 +300,7 @@ int main() {
   std::cout << "## 2. Transforming a Result (`map`) ##\n";
   {
     // 1. Start with a measure that produces an integer (a d20 roll)
-    auto roll_d20 = sub_prob_measures::uniform_int(1, 20);
+    auto roll_d20 = sub_prob_measure::uniform_int(1, 20);
 
     // 2. Define a pure function to transform the integer into a string
     auto describe_roll = [](int roll) {
@@ -326,12 +326,12 @@ int main() {
     std::vector<std::vector<std::string>> categories = {tools, fruits};
 
     // 1. First measure: probabilistically pick a category (a vector of strings)
-    auto pick_category = sub_prob_measures::uniform_range(categories);
+    auto pick_category = sub_prob_measure::uniform_range(categories);
 
     // 2. Second measure factory: a function that takes a category and creates a
     // measure to pick an item from it
     auto pick_item_from = [](const std::vector<std::string>& category) {
-      return sub_prob_measures::uniform_range(category);
+      return sub_prob_measure::uniform_range(category);
     };
 
     // 3. Chain them with and_then (>>=): first pick a category, then pick an
@@ -349,7 +349,7 @@ int main() {
   std::cout << "## 4. Scaling a Measure's Probability (`scale`) ##\n";
   {
     auto measure =
-        sub_prob_measures::pure(42);  // A measure that always produces 42
+        sub_prob_measure::pure(42);  // A measure that always produces 42
 
     // Scale it so it only succeeds with a 20% probability
     auto scaled_measure = measure.scale(0.2);
@@ -374,7 +374,7 @@ int main() {
   // auto number_stream = {1, 3, 5, 8, 11};
 
   std::cout << "Uniformly sampling a number..." << std::endl;
-  sub_prob_measures::uniform_range(number_stream).transform([](int n) {
+  sub_prob_measure::uniform_range(number_stream).transform([](int n) {
     std::cout << "Sampled number: " << n << std::endl;
     return n;
   })();
@@ -382,14 +382,14 @@ int main() {
 
   auto process_number = [](int current_sum, int n) {
     std::cout << "Processing number: " << n << "..." << std::endl;
-    return sub_prob_measures::guard(n % 2 != 0)
+    return sub_prob_measure::guard(n % 2 != 0)
         .transform([=](const std::monostate&) { return current_sum + n; });
   };
 
   std::istringstream input_stream_("1 3 5 9 11");
   auto number_stream_ = std::ranges::istream_view<int>(input_stream_);
 
-  auto computation = sub_prob_measures::foldl_m(0, number_stream_, process_number);
+  auto computation = sub_prob_measure::foldl_m(0, number_stream_, process_number);
 
   std::cout << "Starting the monadic fold over the integer stream..." << std::endl;
   std::optional<int> result = computation();

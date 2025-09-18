@@ -7,7 +7,7 @@
 #include <random>
 #include <ranges>
 
-namespace sub_prob_measures {
+namespace sub_prob_measure {
 
 template <typename Rng>
 constexpr auto get_rng() noexcept;
@@ -271,7 +271,7 @@ template <typename Rng = RngDefault>
 auto bernoulli(const double p) {
   // Get the RNG, then transform it into a boolean result by applying the
   // Bernoulli trial logic.
-  return get_rng<Rng>().transform(
+  return get_rng().transform(
       [p](std::reference_wrapper<Rng> rng_ref) -> bool {
         // Clamp the input p to [0, 1] and handle the trivial cases directly for
         // efficiency.
@@ -313,13 +313,13 @@ template <template <typename> class Dist, typename NumType, typename Rng>
   requires NumericDist<Dist, NumType, Rng>
 auto numeric_dist(const NumType min, const NumType max) {
   // Use guard to handle the precondition, then chain the sampling logic.
-  return guard<Rng>(min <= max)
+  return guard(min <= max)
       .and_then([min, max](const std::monostate&) noexcept {
         // If the guard passes, get the RNG and perform the sampling.
-        return get_rng<Rng>().transform(
+        return get_rng().transform(
             [min, max](std::reference_wrapper<Rng> rng_ref) noexcept(
                 is_dist_call_nothrow_v<Dist, NumType>) {
-              return Dist<NumType>(min, max)(rng_ref.get());
+              return Dist(min, max)(rng_ref.get());
             });
       });
 }
@@ -371,7 +371,7 @@ auto uniform_range(Range&& range) {
   if constexpr (std::ranges::forward_range<Range>) {
     // More efficient path for forward ranges (multi-pass capable).
     const auto is_empty = std::ranges::empty(range);
-    return guard<Rng>(!is_empty).and_then(
+    return guard(!is_empty).and_then(
         [r = std::forward<Range>(range)](const std::monostate&) {
           const size_t size = [&r] {
             if constexpr (std::ranges::sized_range<Range>) {
@@ -394,12 +394,12 @@ auto uniform_range(Range&& range) {
       const auto end = std::ranges::end(range);
 
       // Monadically handle the empty range case.
-      return guard<Rng>(it != end)(rng).and_then(
+      return guard(it != end)(rng).and_then(
           [&](const std::monostate&) {
             T initial_reservoir = *it;
             ++it;
             // Monadically generate initial W value.
-            return uniform_real<double>(0.0, 1.0)(rng).and_then(
+            return uniform_real(0.0, 1.0)(rng).and_then(
                 [&](double u) {
                   // Simplified calculation for k = 1
                   double w = std::exp(std::log(u));
@@ -407,8 +407,8 @@ auto uniform_range(Range&& range) {
                   const auto loop = [&](this auto&& self, T current_reservoir,
                                         double current_w) -> std::optional<T> {
                     // Monadically calculate how many elements to skip.
-                    return uniform_real<double>(0.0, 1.0)(rng).and_then(
-                        [&](double skip_u) -> std::optional<T> {
+                    return uniform_real(0.0, 1.0)(rng).and_then(
+                        [&](const double skip_u) -> std::optional<T> {
                           const auto num_to_skip = static_cast<long>(std::floor(
                               std::log(skip_u) / std::log(1.0 - current_w)));
                           std::ranges::advance(it, num_to_skip, end);
@@ -420,8 +420,8 @@ auto uniform_range(Range&& range) {
 
                           // Monadically update W for the next iteration and
                           // recurse.
-                          return uniform_real<double>(0.0, 1.0)(rng).and_then(
-                              [&](double next_u) {
+                          return uniform_real(0.0, 1.0)(rng).and_then(
+                              [&](const double next_u) {
                                 const double next_w =
                                     current_w * std::exp(std::log(next_u));
                                 return self(std::move(next_reservoir), next_w);
@@ -488,7 +488,7 @@ auto foldl_m(B init, Range&& range, F&& f) noexcept(
       ++it;
       return self(std::move(next_acc));
     };
-    return loop(std::optional<B>(std::move(init)));
+    return loop(std::move(init));
   };
   return SubProbMeasure<B, decltype(sampler), Rng>(std::move(sampler));
 }
