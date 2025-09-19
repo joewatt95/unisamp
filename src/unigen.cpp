@@ -81,6 +81,17 @@ DLL_PUBLIC void UniG::sample(const SolCount* sol_count, uint32_t num_samples) {
   data->sampler.sample(data->conf, *sol_count, num_samples);
 }
 
+DLL_PUBLIC void UniG::sample_unisamp(const SolCount* sol_count,
+                                     uint32_t num_samples) {
+  if (data->sampler.callback_func == NULL) {
+    cout << "ERROR! You must set the callback function or your samples will be "
+            "lost"
+         << endl;
+    exit(-1);
+  }
+  data->sampler.sample_unisamp(data->conf, *sol_count, num_samples);
+}
+
 DLL_PUBLIC string UniG::get_version_sha1() {
   return UnigenIntNS::get_version_sha1();
 }

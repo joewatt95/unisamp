@@ -57,6 +57,7 @@ class UniG
   ~UniG();
   static std::string get_version_sha1();
   void sample(const ApproxMC::SolCount* sol_count, uint32_t num_samples);
+  void sample_unisamp(const ApproxMC::SolCount* sol_count, uint32_t num_samples);
 
   // Misc options -- do NOT to change unless you know what you are doing!
   void set_kappa(double kappa);

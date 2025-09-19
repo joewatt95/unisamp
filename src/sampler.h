@@ -90,6 +90,8 @@ class Sampler {
  public:
   void sample(const Config conf, const SolCount sol_count,
               const uint32_t num_samples);
+  void sample_unisamp(const Config conf, const SolCount sol_count,
+                      const uint32_t num_samples);
   AppMC* appmc;
   SATSolver* solver = NULL;
 
@@ -111,9 +113,13 @@ class Sampler {
   uint32_t gen_n_samples(const uint32_t samples,
                          uint32_t* lastSuccessfulHashOffset,
                          const uint32_t num_samples_needed);
+  uint32_t gen_n_samples_unisamp(const uint32_t samples,
+                                 uint32_t* lastSuccessfulHashOffset,
+                                 const uint32_t num_samples_needed);
   Hash add_hash(uint32_t total_num_hashes);
   string binary(const uint32_t x, const uint32_t length);
   void generate_samples(const uint32_t num_samples);
+  void generate_samples_unisamp(const uint32_t num_samples);
   SolNum bounded_sol_count(uint32_t maxSolutions, const vector<Lit>* assumps,
                            const uint32_t hashCount, uint32_t minSolutions = 1,
                            HashesModels* hm = NULL,
