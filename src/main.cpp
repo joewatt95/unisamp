@@ -506,6 +506,7 @@ int main(int argc, char** argv) {
     myfile = &sample_out;
   }
   unigen->set_callback(mycallback, myfile);
+  // unigen->sample(&sol_count_unig, num_samples);
   unigen->sample_unisamp(&sol_count_unig, num_samples);
 
   delete unigen;

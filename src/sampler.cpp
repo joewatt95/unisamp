@@ -465,10 +465,7 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   // Ideally, this should be computed in terms of thresh_sampler_gen (ie pivot) 
   hiThresh = 42;
 
-  // This should always be 0 for unisamp.
-  loThresh = 0;
-
-  num_samples_needed = sols_to_return(num_samples_needed);
+  loThresh = 1;
 
   verb_print(1, "[unig] Samples requested: " << num_samples_needed);
 
@@ -476,12 +473,11 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
                     << " loThresh: " << loThresh << ", hiThresh: " << hiThresh
                     << ", startiter: " << startiter);
 
-  uint32_t samples = 0;
+  uint32_t num_samples = 0;
   if (startiter > 0) {
     verb_print(1, "[unig] non-ideal sampling case");
-    while (samples < num_samples_needed) {
-      samples += gen_n_samples_unisamp(num_samples_needed);
-    }
+    while (num_samples < num_samples_needed)
+      num_samples += gen_n_samples_unisamp(num_samples_needed);
   } else {
     verb_print(1, "[unig] ideal sampling case");
     vector<vector<int>> out_solutions;
@@ -505,7 +501,7 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
     for (uint32_t i = 0; i < num_samples_needed; ++i) {
       auto it = out_solutions.begin();
       for (uint32_t j = uid(randomEngine); j > 0; --j) ++it;
-      samples++;
+      ++num_samples;
       callback_func(*it, callback_func_data);
     }
   }
@@ -513,7 +509,7 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   verb_print(1, "[unig] Time to sample: "
                     << cpuTimeTotal() - genStartTime << " s"
                     << " -- Time count+samples: " << cpuTimeTotal() << " s");
-  verb_print(1, "[unig] Samples generated: " << samples);
+  verb_print(1, "[unig] Samples generated: " << num_samples);
 }
 
 uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
@@ -533,8 +529,11 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
                                     // output otherwise)
                           )
             .solutions;
-    if (solutionCount <= hiThresh)
-      num_samples += sols_to_return(num_samples_needed);
+
+    std::bernoulli_distribution b(static_cast<double>(solutionCount) /
+                                  static_cast<double>(hiThresh));
+    if (solutionCount <= hiThresh && b(randomEngine)) num_samples += 1;
+
     if (appmc->get_simplify() >= 1) simplify();
   }
 
