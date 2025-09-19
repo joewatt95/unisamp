@@ -35,7 +35,7 @@ using RngDefault = std::mt19937;
  * copyable sampler, the object can be copied. If it contains a stateful,
  * move-only sampler (e.g., from a single-pass range), the object becomes
  * move-only.
- * This class is modelled after the `MaybeT Reader` monad transformer stack.
+ * This class is modelled after the `MaybeT Reader` MonadPlus transformer stack.
  * It encapsulates a function that depends on a shared environment (the random
  * number generator `Rng`) which:
  * 1. Can be any (likely stateful) function. Note that for a seeded random
@@ -134,6 +134,28 @@ class SubProbMeasure {
   }
 
   /**
+   * @brief MonadPlus 'or'. If this measure fails, execute the alternative.
+   * @param alternative A function that returns the alternative SubProbMeasure.
+   */
+  template <typename F>
+  constexpr auto or_else(F&& alternative) && {
+    auto new_sampler = [sampler = std::move(this->_sampler),
+                        alt = std::forward<F>(alternative)](
+                           Rng& rng) mutable -> std::optional<A> {
+      return sampler(rng).or_else([&]() { return alt()(rng); });
+    };
+    return SubProbMeasure<A, decltype(new_sampler), Rng>(
+        std::move(new_sampler));
+  }
+
+  template <typename F>
+  constexpr auto or_else(F&& alternative) const&
+    requires std::is_copy_constructible_v<SamplerFunc>
+  {
+    return SubProbMeasure(*this).or_else(std::forward<F>(alternative));
+  }
+
+  /**
    * @brief Implements functor map (fmap).
    *
    * Applies a pure function to the result of this measure.
@@ -145,8 +167,9 @@ class SubProbMeasure {
   constexpr auto transform(F&& f) && {
     using B = decltype(f(std::declval<A>()));
 
-    auto new_sampler = [sampler = this->_sampler, f = std::forward<F>(f)](
-                           Rng& rng) mutable -> std::optional<B> {
+    auto new_sampler =
+        [sampler = std::move(this->_sampler),
+         f = std::forward<F>(f)](Rng& rng) mutable -> std::optional<B> {
       // Run the original measure and then transform its optional result.
       return sampler(rng).transform(f);
     };
@@ -271,15 +294,14 @@ template <typename Rng = RngDefault>
 auto bernoulli(const double p) {
   // Get the RNG, then transform it into a boolean result by applying the
   // Bernoulli trial logic.
-  return get_rng().transform(
-      [p](std::reference_wrapper<Rng> rng_ref) -> bool {
-        // Clamp the input p to [0, 1] and handle the trivial cases directly for
-        // efficiency.
-        if (p <= 0.0) return false;
-        if (p >= 1.0) return true;
-        std::bernoulli_distribution dist(p);
-        return dist(rng_ref.get());
-      });
+  return get_rng().transform([p](std::reference_wrapper<Rng> rng_ref) -> bool {
+    // Clamp the input p to [0, 1] and handle the trivial cases directly for
+    // efficiency.
+    if (p <= 0.0) return false;
+    if (p >= 1.0) return true;
+    std::bernoulli_distribution dist(p);
+    return dist(rng_ref.get());
+  });
 }
 
 // Concept to check if Dist is a valid numeric distribution for NumType.
@@ -313,15 +335,14 @@ template <template <typename> class Dist, typename NumType, typename Rng>
   requires NumericDist<Dist, NumType, Rng>
 auto numeric_dist(const NumType min, const NumType max) {
   // Use guard to handle the precondition, then chain the sampling logic.
-  return guard(min <= max)
-      .and_then([min, max](const std::monostate&) noexcept {
-        // If the guard passes, get the RNG and perform the sampling.
-        return get_rng().transform(
-            [min, max](std::reference_wrapper<Rng> rng_ref) noexcept(
-                is_dist_call_nothrow_v<Dist, NumType>) {
-              return Dist(min, max)(rng_ref.get());
-            });
-      });
+  return guard(min <= max).and_then([min, max](const std::monostate&) noexcept {
+    // If the guard passes, get the RNG and perform the sampling.
+    return get_rng().transform(
+        [min, max](std::reference_wrapper<Rng> rng_ref) noexcept(
+            is_dist_call_nothrow_v<Dist, NumType>) {
+          return Dist(min, max)(rng_ref.get());
+        });
+  });
 }
 
 /**
@@ -344,6 +365,51 @@ auto uniform_int(const IntType min, const IntType max) {
 template <std::floating_point RealType = double, typename Rng = RngDefault>
 auto uniform_real(const RealType min, const RealType max) {
   return numeric_dist<std::uniform_real_distribution, RealType, Rng>(min, max);
+}
+
+/**
+ * @brief A monadic, probabilistic while loop, denotationally interpreted as
+ * a transfinite fixpoint over the CCPO ordering on sub-probability measures.
+ *
+ * @details This function models a while loop in a functional, monadic style.
+ * It takes an initial value and continues to apply the `body` function as long
+ * as the `cond` predicate returns `true`. The implementation
+ * uses a tail-recursive lambda that chains `std::optional` directly
+ * (instead of SubProbMeasure) for performance, as the latter creates a long
+ * chain of lambdas across recursive calls.
+ *
+ * @tparam A The type of the state value.
+ * @tparam Cond A callable `A -> SubProbMeasure<bool>`.
+ * @tparam Body A callable `A -> SubProbMeasure<A>`.
+ * @param cond The predicate. The loop runs while this returns `true`.
+ * @param body The loop body. It takes the current state and returns a measure
+ * of the next state.
+ * @param init The initial state value.
+ * @return A measure that produces the final state value after the loop
+ * terminates.
+ */
+template <typename A, typename Cond, typename Body, typename Rng = RngDefault>
+auto while_m(Cond&& cond, Body&& body, A init) {
+  auto sampler =
+      [cond = std::forward<Cond>(cond), body = std::forward<Body>(body),
+       init = std::move(init)](Rng& rng) mutable -> std::optional<A> {
+    const auto loop = [&](this auto&& self,
+                          std::optional<A> current_opt) -> std::optional<A> {
+      // Propagate failure from the previous step (body).
+      if (!current_opt) return std::nullopt;
+
+      A current_value = std::move(*current_opt);
+      if (cond(current_value))
+        // Condition is true, make the tail-recursive call with the body.
+        return self(body(std::move(current_value))(rng));
+      else
+        // Base Case: Condition is false, terminate.
+        return std::optional(std::move(current_value));
+    };
+
+    return loop(std::move(init));
+  };
+  return SubProbMeasure<A, decltype(sampler), Rng>(std::move(sampler));
 }
 
 /**
@@ -388,49 +454,49 @@ auto uniform_range(Range&& range) {
   } else {
     // Path for input ranges (single-pass only), via Algorithm L for reservoir
     // sampling.
+
     auto sampler = [range = std::forward<Range>(range)](
                        Rng& rng) mutable -> std::optional<T> {
       auto it = std::ranges::begin(range);
       const auto end = std::ranges::end(range);
 
       // Monadically handle the empty range case.
-      return guard(it != end)(rng).and_then(
-          [&](const std::monostate&) {
-            T initial_reservoir = *it;
-            ++it;
-            // Monadically generate initial W value.
+      return guard(it != end)(rng).and_then([&](const std::monostate&) {
+        T initial_reservoir = *it;
+        ++it;
+        // Monadically generate initial W value.
+        return uniform_real(0.0, 1.0)(rng).and_then([&](double u) {
+          // Simplified calculation for k = 1
+          double w = std::exp(std::log(u));
+
+          const auto loop = [&](this auto&& self, T current_reservoir,
+                                double current_w) -> std::optional<T> {
+            // Monadically calculate how many elements to skip.
             return uniform_real(0.0, 1.0)(rng).and_then(
-                [&](double u) {
-                  // Simplified calculation for k = 1
-                  double w = std::exp(std::log(u));
+                [&](const double skip_u) -> std::optional<T> {
+                  const auto num_to_skip = static_cast<long>(
+                      std::floor(std::log(skip_u) / std::log(1.0 -
+                      current_w)));
+                  std::ranges::advance(it, num_to_skip, end);
 
-                  const auto loop = [&](this auto&& self, T current_reservoir,
-                                        double current_w) -> std::optional<T> {
-                    // Monadically calculate how many elements to skip.
-                    return uniform_real(0.0, 1.0)(rng).and_then(
-                        [&](const double skip_u) -> std::optional<T> {
-                          const auto num_to_skip = static_cast<long>(std::floor(
-                              std::log(skip_u) / std::log(1.0 - current_w)));
-                          std::ranges::advance(it, num_to_skip, end);
+                  if (it == end) return std::move(current_reservoir);
 
-                          if (it == end) return std::move(current_reservoir);
+                  T next_reservoir = *it;
+                  ++it;
 
-                          T next_reservoir = *it;
-                          ++it;
-
-                          // Monadically update W for the next iteration and
-                          // recurse.
-                          return uniform_real(0.0, 1.0)(rng).and_then(
-                              [&](const double next_u) {
-                                const double next_w =
-                                    current_w * std::exp(std::log(next_u));
-                                return self(std::move(next_reservoir), next_w);
-                              });
-                        });
-                  };
-                  return loop(std::move(initial_reservoir), w);
+                  // Monadically update W for the next iteration and
+                  // recurse.
+                  return uniform_real(0.0, 1.0)(rng).and_then(
+                      [&](const double next_u) {
+                        const double next_w =
+                            current_w * std::exp(std::log(next_u));
+                        return self(std::move(next_reservoir), next_w);
+                      });
                 });
-          });
+          };
+          return loop(std::move(initial_reservoir), w);
+        });
+      });
     };
     return SubProbMeasure<T, decltype(sampler), Rng>(std::move(sampler));
   }
@@ -461,36 +527,48 @@ auto uniform_range(Range&& range) {
  */
 template <std::ranges::input_range Range, typename B, typename F,
           typename Rng = RngDefault>
-auto foldl_m(B init, Range&& range, F&& f) noexcept(
-    std::is_nothrow_invocable_v<F, B, std::ranges::range_reference_t<Range>>) {
-  // Helper to check if the folding function `f` is noexcept.
-  static constexpr bool is_f_nothrow =
-      noexcept(f(std::declval<B>(),
-                 std::declval<std::ranges::range_reference_t<Range>>()));
-
-  auto sampler =
-      [init = std::move(init), range = std::forward<Range>(range),
-       f = std::forward<F>(f)](
-          Rng& rng) mutable noexcept(is_f_nothrow) -> std::optional<B> {
-    auto it = std::ranges::begin(range);
-    const auto end = std::ranges::end(range);
-
-    const auto loop = [&](this auto&& self, std::optional<B> acc) noexcept(
-                          is_f_nothrow) -> std::optional<B> {
-      // Base case: Terminate if the range is exhausted.
-      if (it == end) return acc;
-      // Monadically compute the next accumulator state.
-      // If 'acc' is nullopt, 'and_then' short-circuits and propagates it.
-      const auto next_acc =
-          acc.and_then([&](B next_acc_) noexcept(is_f_nothrow) {
-            return f(std::move(next_acc_), *it)(rng);
-          });
-      ++it;
-      return self(std::move(next_acc));
-    };
-    return loop(std::move(init));
+auto foldl_m(B init, Range&& range, F&& f) {
+  // The state of our loop is a struct containing the accumulator and the
+  // iterator.
+  struct State {
+    B acc;
+    std::ranges::iterator_t<Range> it;
   };
-  return SubProbMeasure<B, decltype(sampler), Rng>(std::move(sampler));
+
+  auto it = std::ranges::begin(range);
+  const auto end = std::ranges::end(range);
+
+  // The initial state for the while loop.
+  State initial_state = {std::move(init), std::move(it)};
+
+  // The condition: loop while the iterator is not at the end.
+  auto cond = [end](const State& current_state) {
+    return current_state.it != end;
+  };
+
+  // The body: apply the user's folding function to the accumulator and
+  // the current element, then increment the iterator.
+  auto body = [f = std::forward<F>(f)](State current_state) {
+    // Move the state out of the struct.
+    auto [acc, current_it] = std::move(current_state);
+
+    // Apply the user's function f to get the next accumulator.
+    return f(std::move(acc), *current_it)
+        // Here we capture the move-only iterator 'current_it' by move to extend
+        // its lifetime into the returned SubProbMeasure.
+        .transform([it = std::move(current_it)](B new_acc) mutable {
+          // Return the new state with the incremented iterator
+          ++it;
+          return State{std::move(new_acc), std::move(it)};
+        });
+  };
+
+  // Run the while loop. The result will be a measure of the final state.
+  return while_m(cond, body, std::move(initial_state))
+      .transform([](State final_state) {
+        // Extract just the accumulator from the final state.
+        return std::move(final_state.acc);
+      });
 }
 
-}  // namespace sub_prob_measures
+}  // namespace sub_prob_measure
