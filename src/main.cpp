@@ -483,14 +483,15 @@ int main(int argc, char** argv) {
 
   // Hack to set approxmc parameters for unisamp.
   appmc->set_epsilon(sqrt(2) - 1);
-  // Value of delta when unisamp eps = 0.3
+  // Hardcoded value of delta when unisamp eps = 0.3
   appmc->set_delta(0.01202);
 
   auto sol_count_unig = appmc->count();
   unigen->set_verbosity(verb);
   unigen->set_verb_sampler_cls(verb_banning_cls);
   unigen->set_kappa(kappa);
-  unigen->set_multisample(multisample);
+  // Hack to disable multisample for unisamp.
+  unigen->set_multisample(false);
   unigen->set_full_sampling_vars(sampling_vars_orig);
 
   void* myfile = &std::cout;

@@ -113,9 +113,7 @@ class Sampler {
   uint32_t gen_n_samples(const uint32_t samples,
                          uint32_t* lastSuccessfulHashOffset,
                          const uint32_t num_samples_needed);
-  uint32_t gen_n_samples_unisamp(const uint32_t samples,
-                                 uint32_t* lastSuccessfulHashOffset,
-                                 const uint32_t num_samples_needed);
+  uint32_t gen_n_samples_unisamp(const uint32_t num_samples_needed);
   Hash add_hash(uint32_t total_num_hashes);
   string binary(const uint32_t x, const uint32_t length);
   void generate_samples(const uint32_t num_samples);

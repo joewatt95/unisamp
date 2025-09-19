@@ -269,9 +269,8 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
   startTime = cpuTimeTotal();
   randomEngine.seed(appmc->get_seed());
 
-  /* Compute threshold via formula from TACAS-15 paper */
-  thresh_sampler_gen =
-      ceil(4.03 * (1 + (1 / conf.kappa)) * (1 + (1 / conf.kappa)));
+  // Hardcoded pivot for eps = 0.3
+  thresh_sampler_gen = 13.33;
   verb_print(2, "[unig] threshold_Samplergen: " << thresh_sampler_gen);
 
   if (solCount.hashCount == 0 && solCount.cellSolCount == 0) {
@@ -279,16 +278,18 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
     exit(-1);
   }
 
-  double si = round(solCount.hashCount + log2(solCount.cellSolCount) +
-                    log2(1.8) - log2(thresh_sampler_gen)) -
-              2;
+  // C from approxmc
+  double c = solCount.hashCount + log2(solCount.cellSolCount);
+  // Compute unisamp m
+  int si = log2(c) + 0.5;
+
   if (conf.verb > 3) cout << "c o si: " << si << endl;
   if (si > 0)
     startiter = si;
   else
     startiter = 0; /* Indicate ideal sampling case */
 
-  generate_samples(num_samples);
+  generate_samples_unisamp(num_samples);
 }
 
 vector<Lit> Sampler::set_num_hashes(uint32_t num_wanted,
@@ -457,22 +458,19 @@ uint32_t Sampler::gen_n_samples(const uint32_t num_calls,
   return num_samples;
 }
 
-void Sampler::generate_samples_unisamp(const uint32_t num_samples_needed) {
+void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   double genStartTime = cpuTimeTotal();
 
-  hiThresh = ceil(1 + (1.4142136 * (1 + conf.kappa) * thresh_sampler_gen));
-  loThresh = floor(thresh_sampler_gen / (1.4142136 * (1 + conf.kappa)));
-  const uint32_t samplesPerCall = sols_to_return(num_samples_needed);
-  const uint32_t callsNeeded = num_samples_needed / samplesPerCall +
-                               (bool)(num_samples_needed % samplesPerCall);
+  // Hardcoded value of thresh when eps = 0.3.
+  // Ideally, this should be computed in terms of thresh_sampler_gen (ie pivot) 
+  hiThresh = 42;
+
+  // This should always be 0 for unisamp.
+  loThresh = 0;
+
+  num_samples_needed = sols_to_return(num_samples_needed);
 
   verb_print(1, "[unig] Samples requested: " << num_samples_needed);
-  verb_print(1, "[unig] samples per XOR set:" << samplesPerCall);
-
-  // TODO WARNING what is this 14???????????????????
-  uint32_t callsPerLoop = std::min(solver->nVars() / 14, callsNeeded);
-  callsPerLoop = std::max(callsPerLoop, 1U);
-  // cout << "c [unig] callsPerLoop:" << callsPerLoop << endl;
 
   verb_print(1, "[unig] starting sample generation."
                     << " loThresh: " << loThresh << ", hiThresh: " << hiThresh
@@ -481,10 +479,8 @@ void Sampler::generate_samples_unisamp(const uint32_t num_samples_needed) {
   uint32_t samples = 0;
   if (startiter > 0) {
     verb_print(1, "[unig] non-ideal sampling case");
-    uint32_t lastSuccessfulHashOffset = 0;
     while (samples < num_samples_needed) {
-      samples += gen_n_samples(callsPerLoop, &lastSuccessfulHashOffset,
-                               num_samples_needed);
+      samples += gen_n_samples_unisamp(num_samples_needed);
     }
   } else {
     verb_print(1, "[unig] ideal sampling case");
@@ -520,71 +516,28 @@ void Sampler::generate_samples_unisamp(const uint32_t num_samples_needed) {
   verb_print(1, "[unig] Samples generated: " << samples);
 }
 
-uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_calls,
-                                        uint32_t* lastSuccessfulHashOffset,
-                                        const uint32_t num_samples_needed) {
+uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
   SparseData sparse_data(-1);
   uint32_t num_samples = 0;
-  uint32_t i = 0;
-  while (i < num_calls) {
-    uint32_t hashOffsets[3];
-    hashOffsets[0] = *lastSuccessfulHashOffset;
-
-    // Specific values
-    if (hashOffsets[0] == 0) {  // Starting at q-2; go to q-1 then q
-      hashOffsets[1] = 1;
-      hashOffsets[2] = 2;
-    }
-    if (hashOffsets[0] == 2) {  // Starting at q; go to q-1 then q-2
-      hashOffsets[1] = 1;
-      hashOffsets[2] = 0;
-    }
-
+  while (num_samples < num_samples_needed) {
     map<uint64_t, Hash> hashes;
-    bool ok;
-    for (uint32_t j = 0; j < 3; j++) {
-      uint32_t currentHashOffset = hashOffsets[j];
-      uint32_t currentHashCount = currentHashOffset + startiter;
-      const vector<Lit> assumps = set_num_hashes(currentHashCount, hashes);
-      const uint64_t solutionCount =
-          bounded_sol_count(hiThresh  // max num solutions
-                            ,
-                            &assumps  // assumptions to use
-                            ,
-                            currentHashCount,
-                            loThresh  // min number of solutions (samples not
-                                      // output otherwise)
-                            )
-              .solutions;
-      ok = (solutionCount < hiThresh && solutionCount >= loThresh);
-      if (ok) {
-        num_samples += sols_to_return(num_samples_needed);
-        *lastSuccessfulHashOffset = currentHashOffset;
-        break;
-      }
-      // Number of solutions too small or too large
-
-      // At q-1, and need to pick next hash count
-      if (j == 0 && currentHashOffset == 1) {
-        if (solutionCount < loThresh) {
-          // Go to q-2; next will be q
-          hashOffsets[1] = 0;
-          hashOffsets[2] = 2;
-        } else {
-          // Go to q; next will be q-2
-          hashOffsets[1] = 2;
-          hashOffsets[2] = 0;
-        }
-      }
-    }
-
-    if (ok) {
-      i++;
-    }
-    if (appmc->get_simplify() >= 1) {
-      simplify();
-    }
+    // For unisamp, startiter represents m, which we use directly has our hash count
+    const vector<Lit> assumps = set_num_hashes(startiter, hashes);
+    const uint64_t solutionCount =
+        bounded_sol_count(hiThresh  // max num solutions
+                          ,
+                          &assumps  // assumptions to use
+                          ,
+                          startiter,
+                          loThresh  // min number of solutions (samples not
+                                    // output otherwise)
+                          )
+            .solutions;
+    if (solutionCount <= hiThresh)
+      num_samples += sols_to_return(num_samples_needed);
+    if (appmc->get_simplify() >= 1) simplify();
   }
+
   return num_samples;
 }
 
