@@ -273,7 +273,7 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
   thresh_sampler_gen = 13.33;
 
   // pivot from original unisamp paper, when eps = 0.3
-  thresh_sampler_gen = 200;
+  // thresh_sampler_gen = 200;
 
   verb_print(2, "[unig] threshold_Samplergen: " << thresh_sampler_gen);
 
@@ -466,7 +466,8 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   double genStartTime = cpuTimeTotal();
 
   // Hardcoded value of thresh when eps = 0.3.
-  // Ideally, this should be computed in terms of thresh_sampler_gen (ie pivot) 
+  // Ideally, this should be computed in terms of thresh_sampler_gen (ie pivot),
+  // and eps.
   hiThresh = 42;
 
   // thresh from original unisamp paper, when eps = 0.3
@@ -524,24 +525,28 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
   uint32_t num_samples = 0;
   while (num_samples < num_samples_needed) {
     map<uint64_t, Hash> hashes;
-    // For unisamp, startiter represents m, which we use directly has our hash count
+    // For unisamp, startiter represents m, which we directly use as our hash
+    // count
     const vector<Lit> assumps = set_num_hashes(startiter, hashes);
     const uint64_t solutionCount =
-        bounded_sol_count(hiThresh  // max num solutions
-                          ,
-                          &assumps  // assumptions to use
-                          ,
-                          startiter,
-                          loThresh  // min number of solutions (samples not
-                                    // output otherwise)
-                          )
+        bounded_sol_count(hiThresh + 1  // max num solutions
+                                  ,
+                                  &assumps  // assumptions to use
+                                  ,
+                                  startiter,
+                                  loThresh  // min number of solutions (samples
+                                            // not output otherwise)
+                                  )
             .solutions;
 
-    std::bernoulli_distribution b(static_cast<double>(solutionCount) /
-                                  static_cast<double>(hiThresh));
-    if (solutionCount <= hiThresh && b(randomEngine)) num_samples += 1;
-
-    if (appmc->get_simplify() >= 1) simplify();
+    if (solutionCount <= hiThresh) {
+      std::bernoulli_distribution b(static_cast<double>(solutionCount) /
+                                    static_cast<double>(hiThresh));
+      if (b(randomEngine)) {
+        num_samples += 1;
+        if (appmc->get_simplify() >= 1) simplify();
+      }
+    }
   }
 
   return num_samples;
