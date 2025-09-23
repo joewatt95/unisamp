@@ -486,6 +486,9 @@ int main(int argc, char** argv) {
   // Hardcoded value of delta when unisamp eps = 0.3
   appmc->set_delta(0.01202);
 
+  // delta from original unisamp paper, when eps = 0.3
+  // appmc->set_delta(0.3 / 4);
+
   auto sol_count_unig = appmc->count();
   unigen->set_verbosity(verb);
   unigen->set_verb_sampler_cls(verb_banning_cls);

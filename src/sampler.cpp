@@ -271,6 +271,10 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
 
   // Hardcoded pivot for eps = 0.3
   thresh_sampler_gen = 13.33;
+
+  // pivot from original unisamp paper, when eps = 0.3
+  thresh_sampler_gen = 200;
+
   verb_print(2, "[unig] threshold_Samplergen: " << thresh_sampler_gen);
 
   if (solCount.hashCount == 0 && solCount.cellSolCount == 0) {
@@ -464,6 +468,9 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   // Hardcoded value of thresh when eps = 0.3.
   // Ideally, this should be computed in terms of thresh_sampler_gen (ie pivot) 
   hiThresh = 42;
+
+  // thresh from original unisamp paper, when eps = 0.3
+  // hiThresh = 802;
 
   loThresh = 1;
 
