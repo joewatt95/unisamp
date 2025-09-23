@@ -530,13 +530,13 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
     const vector<Lit> assumps = set_num_hashes(startiter, hashes);
     const uint64_t solutionCount =
         bounded_sol_count(hiThresh + 1  // max num solutions
-                                  ,
-                                  &assumps  // assumptions to use
-                                  ,
-                                  startiter,
-                                  loThresh  // min number of solutions (samples
-                                            // not output otherwise)
-                                  )
+                          ,
+                          &assumps  // assumptions to use
+                          ,
+                          startiter,
+                          loThresh  // min number of solutions (samples
+                                    // not output otherwise)
+                          )
             .solutions;
 
     if (solutionCount <= hiThresh) {
