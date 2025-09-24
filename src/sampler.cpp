@@ -231,6 +231,110 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
   return SolNum(solutions, repeat);
 }
 
+bool Sampler::bounded_sol_count_unisamp(uint32_t maxSolutions,
+                                        const vector<Lit>* assumps,
+                                        const uint32_t hashCount,
+                                        uint32_t minSolutions, HashesModels* hm,
+                                        vector<vector<int>>* out_solutions) {
+  verb_print(1,
+             "[unig] "
+             "[ " << std::setw(7)
+                  << std::setprecision(2) << std::fixed
+                  << (cpuTimeTotal() - startTime) << " ]"
+                  << " bounded_sol_count looking for " << std::setw(4)
+                  << maxSolutions << " solutions"
+                  << " -- hashes active: " << hashCount);
+
+  // Set up things for adding clauses that can later be removed
+  vector<Lit> new_assumps;
+  if (assumps) {
+    assert(assumps->size() == hashCount);
+    new_assumps = *assumps;
+  } else
+    assert(hashCount == 0);
+  solver->new_var();
+  const uint32_t sol_ban_var = solver->nVars() - 1;
+  new_assumps.push_back(Lit(sol_ban_var, true));
+
+  if (appmc->get_simplify() >= 2) {
+    verb_print(1, "[unig] inter-simplifying");
+    double myTime = cpuTime();
+    solver->simplify(&new_assumps);
+    solver->set_verbosity(0);
+    total_inter_simp_time += cpuTime() - myTime;
+    verb_print(1, "[unig] inter-simp finished, total simp time: "
+                      << total_inter_simp_time);
+  }
+
+  const uint64_t repeat = add_glob_banning_cls(hm, sol_ban_var, hashCount);
+  uint64_t solutions = repeat;
+  double last_found_time = cpuTimeTotal();
+  vector<vector<lbool>> models;
+  while (solutions < maxSolutions) {
+    lbool ret = solver->solve(&new_assumps, false);
+    assert(ret == l_False || ret == l_True);
+
+    if (conf.verb >= 2) {
+      cout << "c o [unig] bounded_sol_count ret: " << std::setw(7) << ret;
+      if (ret == l_True)
+        cout << " sol no.  " << std::setw(3) << solutions;
+      else
+        cout << " No more. " << std::setw(3) << "";
+      cout << " T: " << std::setw(7) << std::setprecision(2) << std::fixed
+           << (cpuTimeTotal() - startTime) << " -- hashes act: " << hashCount
+           << " -- T since last: " << std::setw(7) << std::setprecision(2)
+           << std::fixed << (cpuTimeTotal() - last_found_time) << endl;
+      if (conf.verb >= 3) solver->print_stats();
+    }
+    last_found_time = cpuTimeTotal();
+    if (ret != l_True) break;
+
+    // Add solution to set
+    solutions++;
+    const vector<lbool> model = solver->get_model();
+    check_model(model, hm, hashCount);
+    models.push_back(model);
+    if (out_solutions) out_solutions->push_back(get_solution_ints(model));
+
+    // ban solution
+    vector<Lit> lits;
+    lits.push_back(Lit(sol_ban_var, false));
+    for (const uint32_t var : appmc->get_sampling_set()) {
+      assert(solver->get_model()[var] != l_Undef);
+      lits.push_back(Lit(var, solver->get_model()[var] == l_True));
+    }
+    if (conf.verb_sampler_cls)
+      cout << "c o [unig] Adding banning clause: " << lits << endl;
+    solver->add_clause(lits);
+  }
+
+  bool ok = false;
+  const uint64_t thresh = maxSolutions - 1;
+
+  if (minSolutions <= solutions && solutions <= thresh) {
+    // Sampling -- output a random sample of N solutions
+    const size_t index = std::uniform_int_distribution<size_t>(
+        0, thresh - 1)(randomEngine);
+    if (index < models.size()) {
+      const auto& model = models.at(index);
+      callback_func(get_solution_ints(model), callback_func_data);
+      ok = true;
+    }
+  }
+
+  // Save global models
+  if (hm && appmc->get_reuse_models())
+    for (const auto& model : models)
+      hm->glob_model.push_back(SavedModel(hashCount, model));
+
+  // Remove solution banning
+  vector<Lit> cl_that_removes;
+  cl_that_removes.push_back(Lit(sol_ban_var, false));
+  solver->add_clause(cl_that_removes);
+
+  return ok;
+}
+
 void Sampler::sample(Config _conf, const ApproxMC::SolCount solCount,
                      const uint32_t num_samples) {
   conf = _conf;
@@ -282,10 +386,10 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
     exit(-1);
   }
 
-  // C from approxmc
-  double c = solCount.hashCount + log2(solCount.cellSolCount);
+  // Compute unisamp c.
+  double c = pow(2, solCount.hashCount) * solCount.cellSolCount;
   // Compute unisamp m
-  int si = log2(c) + 0.5;
+  int si = log2(c / thresh_sampler_gen) + 0.5;
 
   if (conf.verb > 3) cout << "c o si: " << si << endl;
   if (si > 0)
@@ -528,25 +632,19 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
     // For unisamp, startiter represents m, which we directly use as our hash
     // count
     const vector<Lit> assumps = set_num_hashes(startiter, hashes);
-    const uint64_t solutionCount =
-        bounded_sol_count(hiThresh + 1  // max num solutions
-                          ,
-                          &assumps  // assumptions to use
-                          ,
-                          startiter,
-                          loThresh  // min number of solutions (samples
-                                    // not output otherwise)
-                          )
-            .solutions;
+    const bool ok =
+        bounded_sol_count_unisamp(hiThresh + 1  // max num solutions
+                                  ,
+                                  &assumps  // assumptions to use
+                                  ,
+                                  startiter,
+                                  loThresh  // min number of solutions (samples
+                                            // not output otherwise)
+        );
 
-    if (solutionCount <= hiThresh) {
-      std::bernoulli_distribution b(static_cast<double>(solutionCount) /
-                                    static_cast<double>(hiThresh));
-      if (b(randomEngine)) {
-        num_samples += 1;
-        if (appmc->get_simplify() >= 1) simplify();
-      }
-    }
+    if (ok) num_samples += 1;
+
+    if (appmc->get_simplify() >= 1) simplify();
   }
 
   return num_samples;

@@ -122,6 +122,12 @@ class Sampler {
                            const uint32_t hashCount, uint32_t minSolutions = 1,
                            HashesModels* hm = NULL,
                            vector<vector<int>>* out_solutions = NULL);
+  bool bounded_sol_count_unisamp(uint32_t maxSolutions,
+                                 const vector<Lit>* assumps,
+                                 const uint32_t hashCount,
+                                 uint32_t minSolutions = 1,
+                                 HashesModels* hm = NULL,
+                                 vector<vector<int>>* out_solutions = NULL);
   vector<Lit> set_num_hashes(uint32_t num_wanted, map<uint64_t, Hash>& hashes);
   void simplify();
 

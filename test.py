@@ -4,8 +4,9 @@
 from collections import Counter
 from pathlib import Path
 from subprocess import run
-
 import matplotlib.pyplot as plt
+
+solutions_file = Path('solutions.txt')
 
 
 def count_line_frequencies(filepath):
@@ -39,6 +40,7 @@ def count_line_frequencies(filepath):
 
     return dict(line_counts)
 
+
 def plot_histogram(
         frequencies,
         title="Histogram of Line Frequencies",
@@ -64,10 +66,9 @@ def plot_histogram(
   plt.tight_layout()  # Adjust layout to prevent labels from overlapping
   plt.show()
 
+
 # Main execution block
 if __name__ == "__main__":
-  solutions_file = Path('solutions.txt')
-
   try:
     solutions_file.unlink()
   except FileNotFoundError:
