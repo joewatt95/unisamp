@@ -642,7 +642,7 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
                                             // not output otherwise)
         );
 
-    if (ok) num_samples += 1;
+    num_samples += ok;
 
     if (appmc->get_simplify() >= 1) simplify();
   }
