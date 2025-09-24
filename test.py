@@ -7,6 +7,7 @@ from subprocess import run
 import matplotlib.pyplot as plt
 
 solutions_file = Path('solutions.txt')
+num_solutions = 2048
 
 
 def count_line_frequencies(filepath):
@@ -77,7 +78,7 @@ if __name__ == "__main__":
   # Somehow setting "-e 0.3" doesn't affect anything even in the original unigen
   # algo. It looks like it's setting the epsilon in ApproxMC, rather than that of
   # unigen.
-  run(['./build/unigen_static', '-e', '0.3', '--verb', '2', '--samples', '1024',
+  run(['./build/unigen_static', '-e', '0.3', '--verb', '2', '--samples', f"{num_solutions}",
        '--sampleout', solutions_file, 'benchmarks/test.cnf'])
   # Call the function to count the lines in the sample file
   frequencies = count_line_frequencies(solutions_file)
@@ -89,5 +90,5 @@ if __name__ == "__main__":
     # for line, count in frequencies.items():
     #     print(f"'{line}': {count}")
 
-    plot_histogram(frequencies, title="Histogram of all 1024 solutions",
+    plot_histogram(frequencies, title=f"Histogram of all {num_solutions} solutions",
                    xlabel=f"Unique solutions ({len(frequencies)})")
