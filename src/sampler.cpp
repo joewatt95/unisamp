@@ -231,6 +231,8 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
   return SolNum(solutions, repeat);
 }
 
+// NOTE: This performs bsat AND ALSO samples a solution from the solution set
+// obtained from bsat.
 bool Sampler::bounded_sol_count_unisamp(uint32_t maxSolutions,
                                         const vector<Lit>* assumps,
                                         const uint32_t hashCount,
