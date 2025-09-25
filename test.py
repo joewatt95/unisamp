@@ -6,8 +6,8 @@ from pathlib import Path
 from subprocess import run
 import matplotlib.pyplot as plt
 
-solutions_file = Path('solutions.txt')
-num_solutions = 1024
+samples_file = Path('samples.txt')
+num_samples = 1024 * 20
 
 
 def count_line_frequencies(filepath):
@@ -71,17 +71,17 @@ def plot_histogram(
 # Main execution block
 if __name__ == "__main__":
   try:
-    solutions_file.unlink()
+    samples_file.unlink()
   except FileNotFoundError:
     pass
 
   # Somehow setting "-e 0.3" doesn't affect anything even in the original unigen
   # algo. It looks like it's setting the epsilon in ApproxMC, rather than that of
   # unigen.
-  run(['./build/unigen_static', '-e', '0.3', '--verb', '2', '--samples', f"{num_solutions}",
-       '--sampleout', solutions_file, 'benchmarks/test.cnf'])
+  run(['./build/unigen_static', '-e', '0.3', '--verb', '2', '--samples', f"{num_samples}",
+       '--sampleout', samples_file, 'benchmarks/test.cnf'])
   # Call the function to count the lines in the sample file
-  frequencies = count_line_frequencies(solutions_file)
+  frequencies = count_line_frequencies(samples_file)
 
   # Plot the results
   if frequencies is not None:
@@ -90,5 +90,5 @@ if __name__ == "__main__":
     # for line, count in frequencies.items():
     #     print(f"'{line}': {count}")
 
-    plot_histogram(frequencies, title=f"Histogram of all {num_solutions} solutions",
-                   xlabel=f"Unique solutions ({len(frequencies)})")
+    plot_histogram(frequencies, title=f"Histogram of all {num_samples} samples",
+                   xlabel=f"Unique samples ({len(frequencies)})")
