@@ -7,7 +7,7 @@ from subprocess import run
 import matplotlib.pyplot as plt
 
 samples_file = Path('samples.txt')
-num_samples = 1024 * 20
+num_samples = 1024 * 10
 
 
 def count_line_frequencies(filepath):
