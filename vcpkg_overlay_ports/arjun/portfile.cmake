@@ -1,8 +1,8 @@
 vcpkg_from_github(
   OUT_SOURCE_PATH SOURCE_PATH
   REPO meelgroup/arjun
-  REF 58ec9aff687c9adcd6a26f158a947c07794e43f6
-  SHA512 bb8865744a83ab2d8f7e9fbf37d8c83bd1eaa781b3582346c5d3fc60bd0fcee34b04ad8fd7db9e9814b7e5347b54509ed8f33eb1ccf178ad4f69e9605559d6d8
+  REF d03f7c9c7857dc80af69bb874f9edec382f5fbc3
+  SHA512 119c0bc49215b5340e232b2b632945d23beb6b5f11c5ad79fd60cc0ef88ba63b013aa939d9fb9ddb5ca4a3f5bab15836f2d1adb007c283334bd5bfe24da88cee
   PATCHES
     use_vcpkg_deps.patch
 )

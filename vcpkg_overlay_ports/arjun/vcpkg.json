@@ -1,6 +1,6 @@
 {
   "name": "arjun",
-  "version-string": "2.6.1-58ec9af",
+  "version-string": "2.6.1-d03f7c9",
   "homepage": "https://github.com/meelgroup/arjun",
   "description": "Minimal independent set calculator and CNF minimizer",
   "dependencies": [
