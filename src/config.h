@@ -35,6 +35,8 @@ struct Config {
   unsigned verb_sampler_cls = 0;
   uint32_t multisample = 1;
   int force_sol_extension = 0;
+  double epsilon = 0.3;
+  double r_thresh_pivot = 1.5;
   double kappa =
       0.638; /* Corresponds to UniGen's epsilon=16 in the TACAS-15 paper */
   std::vector<uint32_t> full_sampling_vars;

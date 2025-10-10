@@ -40,38 +40,38 @@ class AppMC;
 class SolCount;
 }  // namespace ApproxMC
 
-namespace UniGen {
+namespace UniSamp {
 
 typedef std::function<void(const std::vector<int>& solution, void* data)>
     callback;
 
-struct UniGenPrivateData;
+struct UniSampPrivateData;
 #ifdef _WIN32
 class __declspec(dllexport) UniG
 #else
-class UniG
+class UniS
 #endif
 {
  public:
-  UniG(ApproxMC::AppMC* appmc);
-  ~UniG();
+  UniS(ApproxMC::AppMC* appmc);
+  ~UniS();
   static std::string get_version_sha1();
   void sample(const ApproxMC::SolCount* sol_count, uint32_t num_samples);
 
   // Misc options -- do NOT to change unless you know what you are doing!
-  void set_kappa(double kappa);
-  void set_multisample(bool multisample);
+  void set_epsilon(double epsilon);
+  void set_r_thresh_pivot(double r_thresh_pivot);
   void set_only_indep_samples(bool only_indep_samples);
   void set_verb_sampler_cls(bool verb_sampler_cls);
   void set_force_sol_extension(bool force_sol_extension);
   void set_verbosity(uint32_t verb);
-  void set_callback(UniGen::callback f, void* data);
+  void set_callback(UniSamp::callback f, void* data);
   void set_full_sampling_vars(const std::vector<uint32_t>& vars);
   void set_empty_sampling_vars(const std::vector<uint32_t>& vars);
 
   // Querying default values
-  double get_kappa() const;
-  bool get_multisample() const;
+  double get_epsilon() const;
+  double get_r_thresh_pivot() const;
   bool get_only_indep_samples() const;
   bool get_verb_sampler_cls() const;
   bool get_force_sol_extension() const;
@@ -83,7 +83,7 @@ class UniG
   ////////////////////////////
   // Do not bother with this, it's private
   ////////////////////////////
-  UniGenPrivateData* data;
+  UniSampPrivateData* data;
 };
 
 }  // namespace UniGen

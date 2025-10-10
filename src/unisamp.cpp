@@ -45,51 +45,51 @@ using std::endl;
 #endif
 
 #define set_get_macro(TYPE, NAME)                                         \
-  DLL_PUBLIC void UniG::set_##NAME(TYPE NAME) { data->conf.NAME = NAME; } \
-  DLL_PUBLIC TYPE UniG::get_##NAME() const { return data->conf.NAME; }
+  DLL_PUBLIC void UniS::set_##NAME(TYPE NAME) { data->conf.NAME = NAME; } \
+  DLL_PUBLIC TYPE UniS::get_##NAME() const { return data->conf.NAME; }
 
-namespace UniGen {
-struct UniGenPrivateData {
+namespace UniSamp {
+struct UniSampPrivateData {
   Sampler sampler;
   AppMC* appmc;
   Config conf;
 };
-}  // namespace UniGen
+}  // namespace UniSamp
 
-using namespace UniGen;
+using namespace UniSamp;
 
-DLL_PUBLIC UniG::UniG(AppMC* appmc) {
-  data = new UniGenPrivateData;
+DLL_PUBLIC UniS::UniS(AppMC* appmc) {
+  data = new UniSampPrivateData;
   data->sampler.appmc = appmc;
 }
 
-DLL_PUBLIC UniG::~UniG() { delete data; }
+DLL_PUBLIC UniS::~UniS() { delete data; }
 
-DLL_PUBLIC void UniG::set_callback(UniGen::callback _callback_func,
+DLL_PUBLIC void UniS::set_callback(UniSamp::callback _callback_func,
                                    void* _callback_func_data) {
   data->sampler.callback_func = _callback_func;
   data->sampler.callback_func_data = _callback_func_data;
 }
 
-DLL_PUBLIC void UniG::sample(const SolCount* sol_count, uint32_t num_samples) {
+DLL_PUBLIC void UniS::sample(const SolCount* sol_count, uint32_t num_samples) {
   if (data->sampler.callback_func == NULL) {
     cout << "ERROR! You must set the callback function or your samples will be "
             "lost"
          << endl;
     exit(-1);
   }
-  data->sampler.sample(data->conf, *sol_count, num_samples);
+  data->sampler.sample_unisamp(data->conf, *sol_count, num_samples);
 }
 
-DLL_PUBLIC string UniG::get_version_sha1() {
+DLL_PUBLIC string UniS::get_version_sha1() {
   return UnigenIntNS::get_version_sha1();
 }
 
-set_get_macro(double, kappa) set_get_macro(bool, multisample)
+set_get_macro(double, epsilon) set_get_macro(double, r_thresh_pivot)
     set_get_macro(bool, force_sol_extension)
         set_get_macro(const std::vector<uint32_t>&, full_sampling_vars)
             set_get_macro(bool, verb_sampler_cls)
 
-                DLL_PUBLIC void UniG::set_verbosity(uint32_t verb) {
+                DLL_PUBLIC void UniS::set_verbosity(uint32_t verb) {
   data->conf.verb = verb;
 }

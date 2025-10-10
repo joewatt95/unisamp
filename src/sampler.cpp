@@ -233,10 +233,9 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
 
 // NOTE: This performs bsat AND ALSO samples a solution from the solution set
 // obtained from bsat.
-bool Sampler::bounded_sol_count_unisamp(uint32_t maxSolutions,
-                                        const vector<Lit>* assumps,
+bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
                                         const uint32_t hashCount,
-                                        uint32_t minSolutions, HashesModels* hm,
+                                        HashesModels* hm,
                                         vector<vector<int>>* out_solutions) {
   verb_print(1,
              "[unig] "
@@ -244,7 +243,7 @@ bool Sampler::bounded_sol_count_unisamp(uint32_t maxSolutions,
                   << std::setprecision(2) << std::fixed
                   << (cpuTimeTotal() - startTime) << " ]"
                   << " bounded_sol_count looking for " << std::setw(4)
-                  << maxSolutions << " solutions"
+                  << hiThresh + 1 << " solutions"
                   << " -- hashes active: " << hashCount);
 
   // Set up things for adding clauses that can later be removed
@@ -272,7 +271,7 @@ bool Sampler::bounded_sol_count_unisamp(uint32_t maxSolutions,
   uint64_t solutions = repeat;
   double last_found_time = cpuTimeTotal();
   vector<vector<lbool>> models;
-  while (solutions < maxSolutions) {
+  while (solutions < hiThresh + 1) {
     lbool ret = solver->solve(&new_assumps, false);
     assert(ret == l_False || ret == l_True);
 
@@ -311,12 +310,10 @@ bool Sampler::bounded_sol_count_unisamp(uint32_t maxSolutions,
   }
 
   bool ok = false;
-  const uint64_t thresh = maxSolutions - 1;
 
-  if (minSolutions <= solutions && solutions <= thresh) {
-    // Sampling -- output a random sample of N solutions
-    const size_t index = std::uniform_int_distribution<size_t>(
-        0, thresh - 1)(randomEngine);
+  if (1 <= solutions && solutions <= hiThresh) {
+    const size_t index =
+        std::uniform_int_distribution<size_t>(0, hiThresh)(randomEngine);
     if (index < models.size()) {
       const auto& model = models.at(index);
       callback_func(get_solution_ints(model), callback_func_data);
@@ -376,7 +373,9 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
   randomEngine.seed(appmc->get_seed());
 
   // Hardcoded pivot for eps = 0.3
-  thresh_sampler_gen = 13.33;
+  // thresh_sampler_gen = 13.33;
+
+  thresh_sampler_gen = 1.0 / (pow(conf.r_thresh_pivot - 1, 2) * conf.epsilon);
 
   // pivot from original unisamp paper, when eps = 0.3
   // thresh_sampler_gen = 200;
@@ -389,13 +388,16 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
   }
 
   // Compute unisamp c.
-  double c = pow(2, solCount.hashCount) * solCount.cellSolCount;
+  // double c = pow(2, solCount.hashCount) * solCount.cellSolCount;
   // Compute unisamp m
-  int si = log2(c / thresh_sampler_gen) + 0.5;
+  // int si = log2(c / thresh_sampler_gen) + 0.5;
 
-  if (conf.verb > 3) cout << "c o si: " << si << endl;
-  if (si > 0)
-    startiter = si;
+  int m = floor(solCount.hashCount + log2(solCount.cellSolCount) -
+                log2(thresh_sampler_gen) + 0.5);
+
+  if (conf.verb > 3) cout << "c o m: " << m << endl;
+  if (m > 0)
+    startiter = m;
   else
     startiter = 0; /* Indicate ideal sampling case */
 
@@ -568,18 +570,33 @@ uint32_t Sampler::gen_n_samples(const uint32_t num_calls,
   return num_samples;
 }
 
+// TODO:
+// Create new Sampler class that just has thresh instead of hiThresh and
+// loThresh Then get rid of loThresh and rename hiThresh to thresh
+
 void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   double genStartTime = cpuTimeTotal();
 
   // Hardcoded value of thresh when eps = 0.3.
   // Ideally, this should be computed in terms of thresh_sampler_gen (ie pivot),
   // and eps.
-  hiThresh = 42;
+  // hiThresh = 42;
+
+  hiThresh = ceil(conf.r_thresh_pivot * (1.0 + 2.0 * thresh_sampler_gen));
+
+  loThresh = 1;
 
   // thresh from original unisamp paper, when eps = 0.3
   // hiThresh = 802;
 
-  loThresh = 1;
+  cout << "epsilon = " << conf.epsilon << endl;
+  cout << "r_thresh_pivot = " << conf.r_thresh_pivot << endl;
+
+  cout << "delta = " << appmc->get_delta() << endl;
+  cout << "pivot = " << thresh_sampler_gen << endl;
+  cout << "thresh = " << hiThresh << endl;
+
+  cout << "m = " << startiter << endl;
 
   verb_print(1, "[unig] Samples requested: " << num_samples_needed);
 
@@ -634,15 +651,7 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
     // For unisamp, startiter represents m, which we directly use as our hash
     // count
     const vector<Lit> assumps = set_num_hashes(startiter, hashes);
-    const bool ok =
-        bounded_sol_count_unisamp(hiThresh + 1  // max num solutions
-                                  ,
-                                  &assumps  // assumptions to use
-                                  ,
-                                  startiter,
-                                  loThresh  // min number of solutions (samples
-                                            // not output otherwise)
-        );
+    const bool ok = bounded_sol_count_unisamp(&assumps, startiter);
 
     num_samples += ok;
 

@@ -37,6 +37,7 @@ Sampler
 
 #include "config.h"
 #include "unigen.h"
+#include "unisamp.h"
 
 using ApproxMC::SolCount;
 using std::cout;
@@ -103,7 +104,7 @@ class Sampler {
   uint32_t startiter;
   uint32_t loThresh;
   uint32_t hiThresh;
-  uint32_t thresh_sampler_gen;
+  double thresh_sampler_gen;
 
   Config conf;
   string gen_rnd_bits(const uint32_t size, const uint32_t numhashes);
@@ -122,10 +123,8 @@ class Sampler {
                            const uint32_t hashCount, uint32_t minSolutions = 1,
                            HashesModels* hm = NULL,
                            vector<vector<int>>* out_solutions = NULL);
-  bool bounded_sol_count_unisamp(uint32_t maxSolutions,
-                                 const vector<Lit>* assumps,
+  bool bounded_sol_count_unisamp(const vector<Lit>* assumps,
                                  const uint32_t hashCount,
-                                 uint32_t minSolutions = 1,
                                  HashesModels* hm = NULL,
                                  vector<vector<int>>* out_solutions = NULL);
   vector<Lit> set_num_hashes(uint32_t num_wanted, map<uint64_t, Hash>& hashes);

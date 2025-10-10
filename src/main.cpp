@@ -45,9 +45,11 @@
 
 #include "time_mem.h"
 #include "unigen.h"
+#include "unisamp.h"
 
 using namespace CMSat;
 using namespace UniGen;
+using namespace UniSamp;
 using std::cout;
 using std::endl;
 using std::set;
@@ -56,6 +58,7 @@ using std::vector;
 
 ApproxMC::AppMC* appmc = NULL;
 UniG* unigen = NULL;
+UniS* unisamp = NULL;
 argparse::ArgumentParser program =
     argparse::ArgumentParser("unigen", UniGen::UniG::get_version_sha1(),
                              argparse::default_arguments::help);
@@ -63,7 +66,8 @@ std::unique_ptr<CMSat::FieldGen> fg;
 
 uint32_t verb = 1;
 uint32_t seed;
-double epsilon;
+double epsilon = 0.3;
+double r_thresh_pivot = 1.5;
 double delta;
 uint32_t verb_banning_cls = 0;
 uint32_t simplify;
@@ -115,7 +119,7 @@ void SIGINT_handler(int) {
 
 void add_unigen_options() {
   ApproxMC::AppMC tmp(fg);
-  epsilon = tmp.get_epsilon();
+  // epsilon = tmp.get_epsilon();
   delta = tmp.get_delta();
   simplify = tmp.get_simplify();
   var_elim_ratio = tmp.get_var_elim_ratio();
@@ -139,6 +143,8 @@ void add_unigen_options() {
          "So e=0.8 means we'll output at most 180%% of exact count and at "
          "least 55%% of exact count. "
          "Lower value means more precise.");
+  myopt2("-r", "--r-thresh-pivot", r_thresh_pivot, atof,
+         "Ratio between threshold and pivot. Default of 1.5.");
   myopt2(
       "-d", "--delta", delta, stod,
       "Confidence parameter, i.e. how sure are we of the result? "
@@ -424,6 +430,7 @@ int main(int argc, char** argv) {
   fg = std::make_unique<ArjunNS::FGenMpz>();
   appmc = new ApproxMC::AppMC(fg);
   unigen = new UniG(appmc);
+  unisamp = new UniS(appmc);
   simp_conf.appmc = true;
   simp_conf.oracle_sparsify = false;
   simp_conf.iter1 = 2;
@@ -480,21 +487,24 @@ int main(int argc, char** argv) {
                           appmc->get_sampl_vars().size());
   }
 
+  unisamp->set_epsilon(epsilon);
+  unisamp->set_r_thresh_pivot(r_thresh_pivot);
+
   // Hack to set approxmc parameters for unisamp.
   appmc->set_epsilon(sqrt(2) - 1);
-  // Hardcoded value of delta when unisamp eps = 0.3
-  appmc->set_delta(0.01202);
+  // appmc->set_delta(0.01202);
+
+  appmc->set_delta((pow(r_thresh_pivot - 1, 2) * epsilon) /
+                   (3.19899995 * r_thresh_pivot * (1 + epsilon)));
 
   // delta from original unisamp paper, when eps = 0.3
   // appmc->set_delta(0.3 / 4);
 
-  auto sol_count_unig = appmc->count();
-  unigen->set_verbosity(verb);
-  unigen->set_verb_sampler_cls(verb_banning_cls);
-  unigen->set_kappa(kappa);
-  // Hack to disable multisample for unisamp.
-  unigen->set_multisample(false);
-  unigen->set_full_sampling_vars(sampling_vars_orig);
+  auto sol_count = appmc->count();
+  unisamp->set_verbosity(verb);
+  unisamp->set_verb_sampler_cls(verb_banning_cls);
+  // unigen->set_kappa(kappa);
+  unisamp->set_full_sampling_vars(sampling_vars_orig);
 
   void* myfile = &std::cout;
   std::ofstream sample_out;
@@ -507,11 +517,12 @@ int main(int argc, char** argv) {
     }
     myfile = &sample_out;
   }
-  unigen->set_callback(mycallback, myfile);
-  // unigen->sample(&sol_count_unig, num_samples);
-  unigen->sample_unisamp(&sol_count_unig, num_samples);
+  unisamp->set_callback(mycallback, myfile);
+  // unigen->sample(&sol_count, num_samples);
+  unisamp->sample(&sol_count, num_samples);
 
   delete unigen;
+  delete unisamp;
   delete appmc;
 
   return 0;
