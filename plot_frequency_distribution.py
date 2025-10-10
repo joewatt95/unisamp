@@ -48,7 +48,7 @@ def plot_line_frequencies(file_path, num_samples, out_file):
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Create the histogram of the frequencies
-    ax.hist(frequencies, # type: ignore
+    ax.hist(frequencies,  # type: ignore
             bins=range(1, max(frequencies) + 2),
             align='left', rwidth=0.8, color='skyblue', edgecolor='black')
 
