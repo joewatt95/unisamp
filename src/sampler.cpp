@@ -589,14 +589,14 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   // thresh from original unisamp paper, when eps = 0.3
   // hiThresh = 802;
 
-  cout << "epsilon = " << conf.epsilon << endl;
-  cout << "r_thresh_pivot = " << conf.r_thresh_pivot << endl;
+  // cout << "epsilon = " << conf.epsilon << endl;
+  // cout << "r_thresh_pivot = " << conf.r_thresh_pivot << endl;
 
-  cout << "delta = " << appmc->get_delta() << endl;
-  cout << "pivot = " << thresh_sampler_gen << endl;
-  cout << "thresh = " << hiThresh << endl;
+  // cout << "delta = " << appmc->get_delta() << endl;
+  // cout << "pivot = " << thresh_sampler_gen << endl;
+  // cout << "thresh = " << hiThresh << endl;
 
-  cout << "m = " << startiter << endl;
+  // cout << "m = " << startiter << endl;
 
   verb_print(1, "[unig] Samples requested: " << num_samples_needed);
 
