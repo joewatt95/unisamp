@@ -359,11 +359,12 @@ int main(int argc, char** argv) {
   appmc->set_epsilon(sqrt(2) - 1);
   // appmc->set_delta(0.01202);
 
+  // Our optimised delta
   appmc->set_delta((pow(r_thresh_pivot - 1, 2) * epsilon) /
                    (3.19899995 * r_thresh_pivot * (1 + epsilon)));
 
-  // delta from original unisamp paper, when eps = 0.3
-  // appmc->set_delta(0.3 / 4);
+  // Original delta from paper
+  // appmc->set_delta(std::min(0.1, epsilon/4));
 
   auto sol_count = appmc->count();
   unisamp->set_verbosity(verb);

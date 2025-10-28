@@ -372,13 +372,11 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
   startTime = cpuTimeTotal();
   randomEngine.seed(appmc->get_seed());
 
-  // Hardcoded pivot for eps = 0.3
-  // thresh_sampler_gen = 13.33;
+  // Our optimised pivot
+  // thresh_sampler_gen = 1.0 / (pow(conf.r_thresh_pivot - 1, 2) * conf.epsilon);
 
-  thresh_sampler_gen = 1.0 / (pow(conf.r_thresh_pivot - 1, 2) * conf.epsilon);
-
-  // pivot from original unisamp paper, when eps = 0.3
-  // thresh_sampler_gen = 200;
+  // Original pivot from paper
+  thresh_sampler_gen = std::max(200.0, 2 / conf.epsilon);
 
   verb_print(2, "[unig] threshold_Samplergen: " << thresh_sampler_gen);
 
@@ -577,18 +575,13 @@ uint32_t Sampler::gen_n_samples(const uint32_t num_calls,
 void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   double genStartTime = cpuTimeTotal();
 
-  // Hardcoded value of thresh when eps = 0.3.
-  // Ideally, this should be computed in terms of thresh_sampler_gen (ie pivot),
-  // and eps.
-  // hiThresh = 42;
-
+  // Our optimised thresh
   hiThresh = ceil(conf.r_thresh_pivot * (1.0 + 2.0 * thresh_sampler_gen));
 
+  // Original thresh from paper
+  // hiThresh = 2 + 4 * ceil(thresh_sampler_gen); 
+
   loThresh = 1;
-
-  // thresh from original unisamp paper, when eps = 0.3
-  // hiThresh = 802;
-
   // cout << "epsilon = " << conf.epsilon << endl;
   // cout << "r_thresh_pivot = " << conf.r_thresh_pivot << endl;
 
