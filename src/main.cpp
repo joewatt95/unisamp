@@ -357,7 +357,6 @@ int main(int argc, char** argv) {
 
   // Hack to set approxmc parameters for unisamp.
   appmc->set_epsilon(sqrt(2) - 1);
-  // appmc->set_delta(0.01202);
 
   // Our optimised delta
   appmc->set_delta((pow(r_thresh_pivot - 1, 2) * epsilon) /
@@ -365,6 +364,9 @@ int main(int argc, char** argv) {
 
   // Original delta from paper
   // appmc->set_delta(std::min(0.1, epsilon/4));
+
+  // Hack to disable multisampling in unigen, for a fairer comparison with unisamp.
+  unigen->set_multisample(0);
 
   auto sol_count = appmc->count();
   unisamp->set_verbosity(verb);
@@ -383,8 +385,11 @@ int main(int argc, char** argv) {
     }
     myfile = &sample_out;
   }
-  unisamp->set_callback(mycallback, myfile);
+
+  // unigen->set_callback(mycallback, myfile);
   // unigen->sample(&sol_count, num_samples);
+
+  unisamp->set_callback(mycallback, myfile);
   unisamp->sample(&sol_count, num_samples);
 
   delete unigen;
