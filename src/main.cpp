@@ -67,7 +67,7 @@ std::unique_ptr<CMSat::FieldGen> fg;
 uint32_t verb = 1;
 uint32_t seed;
 double epsilon = 0.3;
-double r_thresh_pivot = 1.5;
+double r_thresh_pivot = 1.52;
 double delta;
 uint32_t verb_banning_cls = 0;
 uint32_t simplify;
@@ -144,7 +144,7 @@ void add_unigen_options() {
          "least 55%% of exact count. "
          "Lower value means more precise.");
   myopt2("-r", "--r-thresh-pivot", r_thresh_pivot, atof,
-         "Ratio between threshold and pivot. Default of 1.5.");
+         "Controls the ratio between the threshold and pivot. Default of 1.52.");
   myopt2(
       "-d", "--delta", delta, stod,
       "Confidence parameter, i.e. how sure are we of the result? "
@@ -361,6 +361,14 @@ int main(int argc, char** argv) {
   // Our optimised delta
   appmc->set_delta((pow(r_thresh_pivot - 1, 2) * epsilon) /
                    (3.19899995 * r_thresh_pivot * (1 + epsilon)));
+
+  // double pivot = 1.0 / (pow(r_thresh_pivot - 1, 2) * epsilon);
+  // double thresh = ceil(r_thresh_pivot * (1.0 + 2.0 * pivot));
+
+  // double eps = (1.0 + sqrt(1.0 + 4.0 * thresh)) / (2.0 * thresh);
+
+  // appmc->set_delta((pow(r_thresh_pivot - 1, 2) * epsilon) /
+  //                  (2.88 * r_thresh_pivot * (1 + eps) * (1 + epsilon)));
 
   // Original delta from paper
   // appmc->set_delta(std::min(0.1, epsilon/4));

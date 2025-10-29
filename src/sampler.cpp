@@ -373,10 +373,10 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
   randomEngine.seed(appmc->get_seed());
 
   // Our optimised pivot
-  // thresh_sampler_gen = 1.0 / (pow(conf.r_thresh_pivot - 1, 2) * conf.epsilon);
+  thresh_sampler_gen = 1.0 / (pow(conf.r_thresh_pivot - 1, 2) * conf.epsilon);
 
   // Original pivot from paper
-  thresh_sampler_gen = std::max(200.0, 2 / conf.epsilon);
+  // thresh_sampler_gen = std::max(200.0, 2 / conf.epsilon);
 
   verb_print(2, "[unig] threshold_Samplergen: " << thresh_sampler_gen);
 
@@ -385,12 +385,7 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
     exit(-1);
   }
 
-  // Compute unisamp c.
-  // double c = pow(2, solCount.hashCount) * solCount.cellSolCount;
-  // Compute unisamp m
-  // int si = log2(c / thresh_sampler_gen) + 0.5;
-
-  int m = floor(solCount.hashCount + log2(solCount.cellSolCount) -
+  int m = round(solCount.hashCount + log2(solCount.cellSolCount) -
                 log2(thresh_sampler_gen) + 0.5);
 
   if (conf.verb > 3) cout << "c o m: " << m << endl;
@@ -582,6 +577,7 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   // hiThresh = 2 + 4 * ceil(thresh_sampler_gen); 
 
   loThresh = 1;
+
   // cout << "epsilon = " << conf.epsilon << endl;
   // cout << "r_thresh_pivot = " << conf.r_thresh_pivot << endl;
 
@@ -639,7 +635,7 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
 uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
   SparseData sparse_data(-1);
   uint32_t num_samples = 0;
-  while (num_samples < num_samples_needed) {
+  while (num_samples < num_samples_needed) { 
     map<uint64_t, Hash> hashes;
     // For unisamp, startiter represents m, which we directly use as our hash
     // count
