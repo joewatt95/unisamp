@@ -5,14 +5,15 @@ import subprocess
 import time
 from typing import Any, Callable
 
-from .tui.messages import JobUpdate
+from .tui.messages import JobData, JobUpdate
+from .tui.state import Status
 
 
 def run_single_command(
     job_id: int,
     command_template: str,
     value: str,
-    post_message: Callable[[JobUpdate], None],
+    post_message: Callable[[JobUpdate], Any],
 ) -> None:
     """
     Runs a single instance of the command and posts its status via a callback.
@@ -34,13 +35,13 @@ def run_single_command(
         end_time = time.perf_counter()
         duration = end_time - start_time
 
-        post_message(JobUpdate({"id": job_id, "status": "Completed", "duration": duration}))
+        post_message(JobUpdate(JobData(id=job_id, status=Status.COMPLETED, duration=duration)))
 
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.strip().split("\n")[-1]
-        post_message(JobUpdate({"id": job_id, "status": "Failed", "error": error_msg}))
+        post_message(JobUpdate(JobData(id=job_id, status=Status.FAILED, error=error_msg)))
     except FileNotFoundError:
-        post_message(JobUpdate({"id": job_id, "status": "Failed", "error": "Command not found"}))
+        post_message(JobUpdate(JobData(id=job_id, status=Status.FAILED, error="Command not found")))
     except Exception as e:
-        post_message(JobUpdate({"id": job_id, "status": "Failed", "error": str(e)}))
+        post_message(JobUpdate(JobData(id=job_id, status=Status.FAILED, error=str(e))))
 

@@ -1,7 +1,8 @@
 """This module contains the configuration data structure for the application."""
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
+
 
 
 @dataclass
@@ -11,11 +12,11 @@ class Config:
     """
 
     command: str
-    values: list[str]
+    values: Sequence[str]
     repetitions: int
-    parallel_workers: Optional[int]
     show_plot: bool
     output_plot: Optional[str]
     output_stats: Optional[str]
     no_tui: bool
     verbose: int
+    parallel_workers: int = 1

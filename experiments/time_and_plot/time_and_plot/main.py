@@ -118,12 +118,13 @@ Example Usage:
     )
 
     # Set logging level based on verbosity flag
-    if config.verbose == 1:
-        logger.setLevel(logging.DEBUG)
-    elif config.verbose >= 2:
-        logger.setLevel(logging.NOTSET)  # Show all messages
-    else:
-        logger.setLevel(logging.INFO)
+    match config.verbose:
+        case 1:
+            logger.setLevel(logging.DEBUG)
+        case v if v >= 2:
+            logger.setLevel(logging.NOTSET)  # Show all messages
+        case _:
+            logger.setLevel(logging.INFO)
 
     job_results_by_val = None
 

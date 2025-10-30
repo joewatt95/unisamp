@@ -1,19 +1,20 @@
 """This module handles the processing and output of results."""
 
+from collections import defaultdict
+from collections.abc import MutableSequence
 import logging
 import sys
-from collections import defaultdict
-from typing import Any, DefaultDict
+from typing import Optional, cast
 
 from .config import Config
-from .utils import calculate_statistics, print_statistics_table, write_csv_output
+from .utils import ValueStats, calculate_statistics, print_statistics_table, write_csv_output
 
 logger = logging.getLogger(__name__)
 
 
 def process_and_output_results(
     config: Config,
-    job_results_by_val: DefaultDict[str, list[float | None]],
+    job_results_by_val: defaultdict[str, MutableSequence[Optional[float]]],
 ) -> None:
     """
     Calculates final statistics, prints them, writes a CSV, and generates a plot.
@@ -29,7 +30,7 @@ def process_and_output_results(
 
     print_statistics_table(stats, sorted_values)
 
-    plot_values = [v for v in sorted_values if stats.get(v, {}).get("timings")]
+    plot_values = [v for v in sorted_values if stats.get(v, ValueStats()).timings]
 
     if not plot_values:
         logger.warning("No values were successfully timed. Exiting without plotting.")
@@ -40,7 +41,8 @@ def process_and_output_results(
         try:
             from .plotter import plot_results
 
-            plot_means = [stats[v]["mean"] for v in plot_values]
+            plot_means = cast(
+                MutableSequence[float], [stats[v].mean for v in plot_values if stats[v].mean is not None])
             plot_results(
                 plot_values,
                 plot_means,

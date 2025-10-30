@@ -2,15 +2,16 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+from typing import Optional, Sequence
 
 def plot_results(
-    values: list[str],
-    means: list[float],
+    values: Sequence[str],
+    means: Sequence[float],
     reps: int,
     parallel_workers: int,
     command_template: str,
     show_plot: bool,
-    output_plot: str | None,
+    output_plot: Optional[str],
 ) -> None:
     """
     Generates, displays, and saves a plot of values vs. mean timings.
@@ -47,7 +48,7 @@ def plot_results(
     # Add grid, legend, and layout adjustments
     plt.grid(True, linestyle="--", alpha=0.6)
     plt.legend()
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.tight_layout(rect=(0, 0, 1, 0.95))
 
     if output_plot:
         plt.savefig(output_plot)
