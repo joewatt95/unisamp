@@ -571,7 +571,7 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   double genStartTime = cpuTimeTotal();
 
   // Our optimised thresh
-  hiThresh = ceil(conf.r_thresh_pivot * (1.0 + 2.0 * thresh_sampler_gen));
+  hiThresh = ceil(conf.r_thresh_pivot * (0.0 + 2.0 * thresh_sampler_gen));
 
   // Original thresh from paper
   // hiThresh = 2 + 4 * ceil(thresh_sampler_gen); 

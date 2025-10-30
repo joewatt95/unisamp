@@ -362,14 +362,6 @@ int main(int argc, char** argv) {
   appmc->set_delta((pow(r_thresh_pivot - 1, 2) * epsilon) /
                    (3.19899995 * r_thresh_pivot * (1 + epsilon)));
 
-  // double pivot = 1.0 / (pow(r_thresh_pivot - 1, 2) * epsilon);
-  // double thresh = ceil(r_thresh_pivot * (1.0 + 2.0 * pivot));
-
-  // double eps = (1.0 + sqrt(1.0 + 4.0 * thresh)) / (2.0 * thresh);
-
-  // appmc->set_delta((pow(r_thresh_pivot - 1, 2) * epsilon) /
-  //                  (2.88 * r_thresh_pivot * (1 + eps) * (1 + epsilon)));
-
   // Original delta from paper
   // appmc->set_delta(std::min(0.1, epsilon/4));
 

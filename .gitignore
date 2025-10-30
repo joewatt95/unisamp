@@ -6,3 +6,5 @@ compile_commands.json
 *.kdev4
 html/*.wasm
 html/*.js
+**/__pycache__/
+*.pyc
