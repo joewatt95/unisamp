@@ -1,8 +1,9 @@
 """This module contains the plotting functionality."""
 
+from collections.abc import Sequence
 import matplotlib.pyplot as plt
 import numpy as np
-from typing import Optional, Sequence
+from typing import Optional
 
 def plot_results(
     values: Sequence[str],

@@ -1,8 +1,8 @@
 """This module contains the configuration data structure for the application."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
-
+from typing import Optional
 
 
 @dataclass

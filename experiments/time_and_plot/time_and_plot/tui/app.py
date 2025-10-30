@@ -3,7 +3,7 @@
 import statistics
 import time
 from collections import defaultdict
-from collections.abc import MutableSequence, Sequence
+from collections.abc import MutableSequence
 from typing import Optional, cast
 
 from rich.progress_bar import ProgressBar as RichProgressBar
