@@ -94,8 +94,18 @@ class Sampler {
   void sample_unisamp(const Config conf, const SolCount sol_count,
                       const uint32_t num_samples);
   AppMC* appmc;
-  SATSolver* base_appmc_solver;
+
+  // Tune these!
+  const int adaptive_window = 100;
+  const double slowdown_threshold = 2.0;
+
   SATSolver* solver;
+
+  std::unique_ptr<SATSolver> base_solver;
+  std::unique_ptr<SATSolver> working_solver;
+
+  SATSolver* appmc_solver;
+  bool is_using_appmc_solver;
 
   /// What to call on samples
   UniGen::callback callback_func;

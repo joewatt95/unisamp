@@ -32,6 +32,7 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <ctime>
@@ -367,8 +368,16 @@ void Sampler::sample(Config _conf, const ApproxMC::SolCount solCount,
 void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
                              const uint32_t num_samples) {
   conf = _conf;
-  base_appmc_solver = appmc->get_solver();
-  orig_num_vars = base_appmc_solver->nVars();
+
+  appmc_solver = appmc->get_solver();
+  is_using_appmc_solver = true;
+
+  working_solver.reset();
+
+  base_solver = std::make_unique<SATSolver>();
+  copy_simp_solver_to_solver(appmc_solver, base_solver.get());
+
+  orig_num_vars = appmc_solver->nVars();
   startTime = cpuTimeTotal();
   randomEngine.seed(appmc->get_seed());
 
@@ -574,7 +583,7 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   hiThresh = ceil(conf.r_thresh_pivot * (0.0 + 2.0 * thresh_sampler_gen));
 
   // Original thresh from paper
-  // hiThresh = 2 + 4 * ceil(thresh_sampler_gen); 
+  // hiThresh = 2 + 4 * ceil(thresh_sampler_gen);
 
   loThresh = 1;
 
@@ -635,10 +644,40 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
 uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
   SparseData sparse_data(-1);
   uint32_t num_samples = 0;
+
+  double baseline_time = -1.0;
+  double current_window_time = 0.0;
+
   while (num_samples < num_samples_needed) {
-    delete solver;
-    solver = new SATSolver;
-    copy_simp_solver_to_solver(base_appmc_solver, solver);
+    // Check if window is complete.
+    if (num_samples > 0 && num_samples % adaptive_window == 0) {
+      // Average for current window.
+      const double avg_time = current_window_time / adaptive_window;
+      // Set baseline on first run.
+      if (baseline_time < 0.0) baseline_time = avg_time;
+
+      // Check for slowdown, and flush solver bloat if needed.
+      const double slowdown = avg_time / baseline_time;
+      if (slowdown > slowdown_threshold) {
+        verb_print(1, "[unig] Restarting solver due to slowdown: " << slowdown);
+
+        auto new_solver = std::make_unique<SATSolver>();
+        copy_simp_solver_to_solver(base_solver.get(), new_solver.get());
+        working_solver = std::move(new_solver);
+
+        is_using_appmc_solver = false;
+        appmc_solver = nullptr;
+
+        // Reset baseline.
+        baseline_time = -1.0;
+      }
+      // Reset for next window.
+      current_window_time = 0.0;
+    }
+
+    solver = is_using_appmc_solver ? appmc_solver : working_solver.get();
+
+    auto start = std::chrono::high_resolution_clock::now();
 
     map<uint64_t, Hash> hashes;
     // For unisamp, startiter represents m, which we directly use as our hash
@@ -649,6 +688,10 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
     num_samples += ok;
 
     if (appmc->get_simplify() >= 1) simplify();
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    current_window_time += elapsed.count();
   }
 
   return num_samples;
