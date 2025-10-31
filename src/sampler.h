@@ -94,11 +94,12 @@ class Sampler {
   void sample_unisamp(const Config conf, const SolCount sol_count,
                       const uint32_t num_samples);
   AppMC* appmc;
-  SATSolver* solver = NULL;
+  SATSolver* base_appmc_solver;
+  SATSolver* solver;
 
   /// What to call on samples
-  UniGen::callback callback_func = NULL;
-  void* callback_func_data = NULL;
+  UniGen::callback callback_func;
+  void* callback_func_data;
 
  private:
   uint32_t startiter;

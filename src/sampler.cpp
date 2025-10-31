@@ -367,8 +367,8 @@ void Sampler::sample(Config _conf, const ApproxMC::SolCount solCount,
 void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
                              const uint32_t num_samples) {
   conf = _conf;
-  solver = appmc->get_solver();
-  orig_num_vars = solver->nVars();
+  base_appmc_solver = appmc->get_solver();
+  orig_num_vars = base_appmc_solver->nVars();
   startTime = cpuTimeTotal();
   randomEngine.seed(appmc->get_seed());
 
@@ -635,7 +635,11 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
 uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
   SparseData sparse_data(-1);
   uint32_t num_samples = 0;
-  while (num_samples < num_samples_needed) { 
+  while (num_samples < num_samples_needed) {
+    delete solver;
+    solver = new SATSolver;
+    copy_simp_solver_to_solver(base_appmc_solver, solver);
+
     map<uint64_t, Hash> hashes;
     // For unisamp, startiter represents m, which we directly use as our hash
     // count
