@@ -95,9 +95,24 @@ class Sampler {
                       const uint32_t num_samples);
   AppMC* appmc;
 
-  // Tune these!
-  const int adaptive_window = 100;
-  const double slowdown_threshold = 2.0;
+  // --- Dynamic Heuristic Fields ---
+  int current_window_size;
+  double current_slowdown_threshold;
+
+  // --- Heuristic Constants (these are your new tuning knobs) ---
+  const int WINDOW_MIN = 10;   // Start with a hyper-reactive 10-sample window
+  const int WINDOW_MAX = 200;  // Don't let the window grow forever
+  const double WINDOW_GROW_FACTOR =
+      1.5;  // How fast to grow the window (e.g., 10, 15, 22, 33...)
+
+  const double THRESHOLD_MIN = 1.8;  // Start with a very strict 1.8x slowdown
+  const double THRESHOLD_MAX =
+      3.0;  // Don't let the threshold become too lenient
+  const double THRESHOLD_RELAX_STEP = 0.2;  // How much to relax the threshold
+
+  // This defines the line between a "slip-up" and a "disaster".
+  // 1.5x means a failure is "Major" if it's 50% worse than the threshold.
+  const double CATASTROPHE_FACTOR = 1.5;
 
   SATSolver* solver;
 
@@ -106,6 +121,10 @@ class Sampler {
 
   SATSolver* appmc_solver;
   bool is_using_appmc_solver;
+
+  double baseline_time;
+  double current_window_total_time;
+  int samples_in_window;
 
   /// What to call on samples
   UniGen::callback callback_func;
@@ -130,6 +149,12 @@ class Sampler {
   string binary(const uint32_t x, const uint32_t length);
   void generate_samples(const uint32_t num_samples);
   void generate_samples_unisamp(const uint32_t num_samples);
+
+  // For dynamic backoff
+  void load_and_initialize();
+  void reset_working_solver();
+  void check_and_perform_reset();
+
   SolNum bounded_sol_count(uint32_t maxSolutions, const vector<Lit>* assumps,
                            const uint32_t hashCount, uint32_t minSolutions = 1,
                            HashesModels* hm = NULL,

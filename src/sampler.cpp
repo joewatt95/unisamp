@@ -369,13 +369,7 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
                              const uint32_t num_samples) {
   conf = _conf;
 
-  appmc_solver = appmc->get_solver();
-  is_using_appmc_solver = true;
-
-  working_solver.reset();
-
-  base_solver = std::make_unique<SATSolver>();
-  copy_simp_solver_to_solver(appmc_solver, base_solver.get());
+  load_and_initialize();
 
   orig_num_vars = appmc_solver->nVars();
   startTime = cpuTimeTotal();
@@ -641,44 +635,136 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   verb_print(1, "[unig] Samples generated: " << num_samples);
 }
 
+void Sampler::load_and_initialize() {
+  // ... (all the solver borrowing logic is the same) ...
+  appmc_solver = appmc->get_solver();
+  is_using_appmc_solver = true;
+
+  base_solver = std::make_unique<CMSat::SATSolver>();
+  copy_simp_solver_to_solver(appmc_solver, base_solver.get());
+
+  // --- Initialize Heuristics ---
+  baseline_time = -1.0;
+  current_window_total_time = 0.0;
+  samples_in_window = 0;
+
+  // Start in the most aggressive state
+  current_window_size = WINDOW_MIN;
+  current_slowdown_threshold = THRESHOLD_MIN;
+}
+
+void Sampler::reset_working_solver() {
+  // 1. Create a new, "cold" solver that *we* will own
+  auto new_solver = std::make_unique<CMSat::SATSolver>();
+
+  // 2. Copy the simplified "golden image" into it
+  CMSat::copy_simp_solver_to_solver(base_solver.get(), new_solver.get());
+
+  // 3. Take ownership. The old `working_solver` (if any) is auto-deleted.
+  working_solver = std::move(new_solver);
+
+  // 4. SWITCH THE FLAG! We are now done with the ApproxMC solver.
+  is_using_appmc_solver = false;
+
+  // 5. (Good practice) Forget the borrowed pointer so we don't use it by
+  // mistake. The ApproxMC object is still responsible for deleting it at
+  // program exit.
+  appmc_solver = nullptr;
+
+  // 6. --- Reset Heuristics to Aggressive Default ---
+
+  // We MUST get a new baseline, as this "cold" solver will have
+  // a different (likely slower) initial performance.
+  baseline_time = -1.0;
+  current_window_total_time = 0.0;
+  samples_in_window = 0;
+
+  // Reset to the most aggressive, "simple formula" settings
+  current_window_size = WINDOW_MIN;
+  current_slowdown_threshold = THRESHOLD_MIN;
+}
+
+void Sampler::check_and_perform_reset() {
+  // 1. Check if the *current* window is full
+  if (samples_in_window < current_window_size) {
+    return;  // Window not full yet
+  }
+
+  // 2. The window is full. Calculate this window's average time.
+  double recent_avg = current_window_total_time / samples_in_window;
+
+  // 3. Reset the counters for the *next* window
+  current_window_total_time = 0.0;
+  samples_in_window = 0;
+
+  // 4. Set the baseline on the very first run.
+  if (baseline_time < 0) {
+    baseline_time = recent_avg;
+    return;  // Don't check on the first run, just set the baseline
+  }
+
+  // --- The NEW Hybrid Check ---
+
+  if (recent_avg <= baseline_time * current_slowdown_threshold) {
+    // --- PASSED: The hot start is working! ---
+    // (This "Reward" logic is unchanged)
+
+    current_window_size =
+        std::min((int)(current_window_size * WINDOW_GROW_FACTOR), WINDOW_MAX);
+    current_slowdown_threshold = std::min(
+        current_slowdown_threshold + THRESHOLD_RELAX_STEP, THRESHOLD_MAX);
+
+  } else {
+    // --- FAILED: We are too slow. ---
+
+    // *** THE NEW LOGIC: ***
+    // Is this solver still in the "Nursery"?
+    // We define "Nursery" as any solver that hasn't been "promoted" at least
+    // once.
+    bool is_in_nursery = (current_window_size <= WINDOW_MIN);
+    // Note: You could also use (current_slowdown_threshold <= THRESHOLD_MIN)
+
+    if (is_in_nursery) {
+      // --- "NURSERY" FAILURE ---
+      // This solver failed its very first test.
+      // It's a "simple formula" case. It gets NO leniency.
+      // Action: MAJOR FLUSH (Hard Reset).
+      reset_working_solver();
+    } else {
+      // --- "TRUSTED" FAILURE ---
+      // This solver was *proven* (it passed at least one check).
+      // NOW we grant it the "Minor vs. Major" logic.
+
+      double catastrophe_limit =
+          (baseline_time * current_slowdown_threshold) * CATASTROPHE_FACTOR;
+
+      if (recent_avg < catastrophe_limit) {
+        // "MINOR" FAILURE (Soft Reset)
+        current_window_size =
+            std::max((int)(current_window_size / 2.0), WINDOW_MIN);
+      } else {
+        // "MAJOR" FAILURE (Hard Reset)
+        reset_working_solver();
+      }
+    }
+  }
+}
+
 uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
   SparseData sparse_data(-1);
   uint32_t num_samples = 0;
 
-  double baseline_time = -1.0;
-  double current_window_time = 0.0;
-
   while (num_samples < num_samples_needed) {
-    // Check if window is complete.
-    if (num_samples > 0 && num_samples % adaptive_window == 0) {
-      // Average for current window.
-      const double avg_time = current_window_time / adaptive_window;
-      // Set baseline on first run.
-      if (baseline_time < 0.0) baseline_time = avg_time;
+    // 1. Check if the current window is full and if we need to reset.
+    check_and_perform_reset();
 
-      // Check for slowdown, and flush solver bloat if needed.
-      const double slowdown = avg_time / baseline_time;
-      if (slowdown > slowdown_threshold) {
-        verb_print(1, "[unig] Restarting solver due to slowdown: " << slowdown);
-
-        auto new_solver = std::make_unique<SATSolver>();
-        copy_simp_solver_to_solver(base_solver.get(), new_solver.get());
-        working_solver = std::move(new_solver);
-
-        is_using_appmc_solver = false;
-        appmc_solver = nullptr;
-
-        // Reset baseline.
-        baseline_time = -1.0;
-      }
-      // Reset for next window.
-      current_window_time = 0.0;
-    }
-
+    // 2. Decide which solver to use for this iteration.
     solver = is_using_appmc_solver ? appmc_solver : working_solver.get();
 
+    // 3. Start the timer.
     auto start = std::chrono::high_resolution_clock::now();
 
+    // 4. Do the actual work.
     map<uint64_t, Hash> hashes;
     // For unisamp, startiter represents m, which we directly use as our hash
     // count
@@ -689,9 +775,13 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
 
     if (appmc->get_simplify() >= 1) simplify();
 
+    // 5. Stop the timer.
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
-    current_window_time += elapsed.count();
+
+    // 6. Update the timers for the *next* check
+    current_window_total_time += elapsed.count();
+    samples_in_window++;
   }
 
   return num_samples;
