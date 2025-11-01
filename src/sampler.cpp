@@ -635,6 +635,15 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   verb_print(1, "[unig] Samples generated: " << num_samples);
 }
 
+// Helper to reset the heuristics to aggressive state.
+void Sampler::reset_heuristic_params() {
+  baseline_time = std::nullopt;
+  current_window_total_time = 0.0;
+  samples_in_window = 0;
+  current_window_size = WINDOW_MIN;
+  current_slowdown_threshold = THRESHOLD_MIN;
+}
+
 void Sampler::load_and_initialize() {
   // ... (all the solver borrowing logic is the same) ...
   appmc_solver = appmc->get_solver();
@@ -644,13 +653,7 @@ void Sampler::load_and_initialize() {
   copy_simp_solver_to_solver(appmc_solver, base_solver.get());
 
   // --- Initialize Heuristics ---
-  baseline_time = -1.0;
-  current_window_total_time = 0.0;
-  samples_in_window = 0;
-
-  // Start in the most aggressive state
-  current_window_size = WINDOW_MIN;
-  current_slowdown_threshold = THRESHOLD_MIN;
+  reset_heuristic_params();
 }
 
 void Sampler::reset_working_solver() {
@@ -686,9 +689,8 @@ void Sampler::reset_working_solver() {
 
 void Sampler::check_and_perform_reset() {
   // 1. Check if the *current* window is full
-  if (samples_in_window < current_window_size) {
+  if (samples_in_window < current_window_size)
     return;  // Window not full yet
-  }
 
   // 2. The window is full. Calculate this window's average time.
   double recent_avg = current_window_total_time / samples_in_window;
@@ -698,54 +700,51 @@ void Sampler::check_and_perform_reset() {
   samples_in_window = 0;
 
   // 4. Set the baseline on the very first run.
-  if (baseline_time < 0) {
-    baseline_time = recent_avg;
+  if (!baseline_time.has_value()) {
+    baseline_time.emplace(recent_avg);
     return;  // Don't check on the first run, just set the baseline
   }
 
-  // --- The NEW Hybrid Check ---
+  const double current_fail_threshold =
+      baseline_time.value() * current_slowdown_threshold;
 
-  if (recent_avg <= baseline_time * current_slowdown_threshold) {
-    // --- PASSED: The hot start is working! ---
-    // (This "Reward" logic is unchanged)
+  // --- The Hybrid Check ---
+  if (recent_avg <= current_fail_threshold) {
+    // --- PASSED: Reward the solver ---
 
-    current_window_size =
-        std::min((int)(current_window_size * WINDOW_GROW_FACTOR), WINDOW_MAX);
-    current_slowdown_threshold = std::min(
-        current_slowdown_threshold + THRESHOLD_RELAX_STEP, THRESHOLD_MAX);
+    int new_window_size =
+        static_cast<int>(current_window_size * WINDOW_GROW_FACTOR);
+    current_window_size = std::clamp(new_window_size, WINDOW_MIN, WINDOW_MAX);
 
+    double new_threshold = current_slowdown_threshold + THRESHOLD_RELAX_STEP;
+    current_slowdown_threshold =
+        std::clamp(new_threshold, THRESHOLD_MIN, THRESHOLD_MAX);
   } else {
-    // --- FAILED: We are too slow. ---
+    // --- FAILED: We are too slow ---
 
-    // *** THE NEW LOGIC: ***
     // Is this solver still in the "Nursery"?
-    // We define "Nursery" as any solver that hasn't been "promoted" at least
-    // once.
-    bool is_in_nursery = (current_window_size <= WINDOW_MIN);
-    // Note: You could also use (current_slowdown_threshold <= THRESHOLD_MIN)
-
-    if (is_in_nursery) {
-      // --- "NURSERY" FAILURE ---
+    // We define "Nursery" as any solver that hasn't been "promoted" at least once.
+    const bool is_in_nursery = (current_window_size <= WINDOW_MIN);
+    if (is_in_nursery)
+      // "Nursery" failure = Hard Reset
       // This solver failed its very first test.
       // It's a "simple formula" case. It gets NO leniency.
-      // Action: MAJOR FLUSH (Hard Reset).
       reset_working_solver();
-    } else {
-      // --- "TRUSTED" FAILURE ---
-      // This solver was *proven* (it passed at least one check).
-      // NOW we grant it the "Minor vs. Major" logic.
-
-      double catastrophe_limit =
-          (baseline_time * current_slowdown_threshold) * CATASTROPHE_FACTOR;
-
+    else {
+      // "Trusted" failure = Check Minor/Major failure
+      // // This solver was *proven* (it passed at least one check).
+      // NOW we grant it the "Minor vs. Major failure" logic.
+      const double catastrophe_limit =
+          current_fail_threshold * CATASTROPHE_FACTOR;
       if (recent_avg < catastrophe_limit) {
         // "MINOR" FAILURE (Soft Reset)
+        int new_window_size = static_cast<int>(current_window_size / 2.0);
         current_window_size =
-            std::max((int)(current_window_size / 2.0), WINDOW_MIN);
-      } else {
+            std::clamp(new_window_size, WINDOW_MIN, WINDOW_MAX);
+      }
+      else
         // "MAJOR" FAILURE (Hard Reset)
         reset_working_solver();
-      }
     }
   }
 }

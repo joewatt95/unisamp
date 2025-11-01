@@ -33,6 +33,7 @@ Sampler
 
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <random>
 
 #include "config.h"
@@ -100,19 +101,19 @@ class Sampler {
   double current_slowdown_threshold;
 
   // --- Heuristic Constants (these are your new tuning knobs) ---
-  const int WINDOW_MIN = 10;   // Start with a hyper-reactive 10-sample window
-  const int WINDOW_MAX = 200;  // Don't let the window grow forever
-  const double WINDOW_GROW_FACTOR =
+  static constexpr int WINDOW_MIN = 10;   // Start with a hyper-reactive 10-sample window
+  static constexpr int WINDOW_MAX = 200;  // Don't let the window grow forever
+  static constexpr double WINDOW_GROW_FACTOR =
       1.5;  // How fast to grow the window (e.g., 10, 15, 22, 33...)
 
-  const double THRESHOLD_MIN = 1.8;  // Start with a very strict 1.8x slowdown
-  const double THRESHOLD_MAX =
+  static constexpr double THRESHOLD_MIN = 1.8;  // Start with a very strict 1.8x slowdown
+  static constexpr double THRESHOLD_MAX =
       3.0;  // Don't let the threshold become too lenient
-  const double THRESHOLD_RELAX_STEP = 0.2;  // How much to relax the threshold
+  static constexpr double THRESHOLD_RELAX_STEP = 0.2;  // How much to relax the threshold
 
   // This defines the line between a "slip-up" and a "disaster".
   // 1.5x means a failure is "Major" if it's 50% worse than the threshold.
-  const double CATASTROPHE_FACTOR = 1.5;
+  static constexpr double CATASTROPHE_FACTOR = 1.5;
 
   SATSolver* solver;
 
@@ -122,7 +123,7 @@ class Sampler {
   SATSolver* appmc_solver;
   bool is_using_appmc_solver;
 
-  double baseline_time;
+  std::optional<double> baseline_time;
   double current_window_total_time;
   int samples_in_window;
 
@@ -151,6 +152,7 @@ class Sampler {
   void generate_samples_unisamp(const uint32_t num_samples);
 
   // For dynamic backoff
+  void reset_heuristic_params();
   void load_and_initialize();
   void reset_working_solver();
   void check_and_perform_reset();
