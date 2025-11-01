@@ -650,7 +650,7 @@ void Sampler::load_and_initialize() {
   is_using_appmc_solver = true;
 
   base_solver = std::make_unique<CMSat::SATSolver>();
-  copy_simp_solver_to_solver(appmc_solver, base_solver.get());
+  copy_solver_to_solver(appmc_solver, base_solver.get());
 
   // --- Initialize Heuristics ---
   reset_heuristic_params();
@@ -661,10 +661,13 @@ void Sampler::reset_working_solver() {
   auto new_solver = std::make_unique<CMSat::SATSolver>();
 
   // 2. Copy the simplified "golden image" into it
-  CMSat::copy_simp_solver_to_solver(base_solver.get(), new_solver.get());
+  copy_solver_to_solver(base_solver.get(), new_solver.get());
 
   // 3. Take ownership. The old `working_solver` (if any) is auto-deleted.
   working_solver = std::move(new_solver);
+
+  solver = working_solver.get();
+  simplify();
 
   // 4. SWITCH THE FLAG! We are now done with the ApproxMC solver.
   is_using_appmc_solver = false;
