@@ -1,0 +1,6 @@
+# Command: ../build/unigen_static -e 0.3 --samples 100 benchmarks/{}.cnf
+# Repetitions: 20
+# Parallel Workers: 8
+Value,Runs,Mean,Median,Min,Max
+GuidanceService.sk_4_27.cnf.gz.no_w,20,25.38790479039981,25.6777873154997,22.878398205999474,27.480557019000116
+LoginService.sk_20_34.cnf.gz.no_w,20,134.86839373640024,153.0747769589998,100.00991788000101,158.245060362
