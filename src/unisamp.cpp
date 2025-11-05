@@ -27,6 +27,7 @@
  */
 
 #include <iostream>
+#include <memory>
 
 #include "GitSHA1.h"
 #include "config.h"
@@ -59,11 +60,11 @@ struct UniSampPrivateData {
 using namespace UniSamp;
 
 DLL_PUBLIC UniS::UniS(AppMC* appmc) {
-  data = new UniSampPrivateData;
+  data = std::make_unique<UniSampPrivateData>();
   data->sampler.appmc = appmc;
 }
 
-DLL_PUBLIC UniS::~UniS() { delete data; }
+DLL_PUBLIC UniS::~UniS() {}
 
 DLL_PUBLIC void UniS::set_callback(UniSamp::callback _callback_func,
                                    void* _callback_func_data) {
@@ -72,7 +73,7 @@ DLL_PUBLIC void UniS::set_callback(UniSamp::callback _callback_func,
 }
 
 DLL_PUBLIC void UniS::sample(const SolCount* sol_count, uint32_t num_samples) {
-  if (data->sampler.callback_func == NULL) {
+  if (!data->sampler.callback_func) {
     cout << "ERROR! You must set the callback function or your samples will be "
             "lost"
          << endl;

@@ -56,9 +56,9 @@ using std::set;
 using std::string;
 using std::vector;
 
-ApproxMC::AppMC* appmc = NULL;
-UniG* unigen = NULL;
-UniS* unisamp = NULL;
+ApproxMC::AppMC* appmc = nullptr;
+UniG* unigen = nullptr;
+UniS* unisamp = nullptr;
 argparse::ArgumentParser program =
     argparse::ArgumentParser("unigen", UniGen::UniG::get_version_sha1(),
                              argparse::default_arguments::help);
@@ -67,7 +67,7 @@ std::unique_ptr<CMSat::FieldGen> fg;
 uint32_t verb = 1;
 uint32_t seed;
 double epsilon = 0.3;
-double r_thresh_pivot = 1.52;
+double r_thresh_pivot = 1.6;
 double delta;
 uint32_t verb_banning_cls = 0;
 uint32_t simplify;
@@ -92,12 +92,12 @@ bool verb_sampler_cls;
 
 #define myopt(name, var, fun, hhelp)                             \
   program.add_argument(name)                                     \
-      .action([&](const auto& a) { var = std::fun(a.c_str()); }) \
+      .action([&](const auto& a) { var = std::fun(a); })          \
       .default_value(var)                                        \
       .help(hhelp)
 #define myopt2(name1, name2, var, fun, hhelp)                    \
   program.add_argument(name1, name2)                             \
-      .action([&](const auto& a) { var = std::fun(a.c_str()); }) \
+      .action([&](const auto& a) { var = std::fun(a); })          \
       .default_value(var)                                        \
       .help(hhelp)
 
@@ -126,7 +126,7 @@ void add_unigen_options() {
   sparse = tmp.get_sparse();
   seed = tmp.get_seed();
 
-  myopt2("-v", "--verb", verb, atoi, "Verbosity");
+  myopt2("-v", "--verb", verb, stoi, "Verbosity");
   program.add_argument("-v", "--version")
       .action([&](const auto&) {
         print_version();
@@ -134,7 +134,7 @@ void add_unigen_options() {
       })
       .flag()
       .help("Print version and exit");
-  myopt2("-s", "--seed", seed, atoi, "Seed");
+  myopt2("-s", "--seed", seed, stoi, "Seed");
   myopt2("-e", "--epsilon", epsilon, stod,
          "Tolerance parameter, i.e. how close is the count from the correct "
          "count? "
@@ -143,8 +143,8 @@ void add_unigen_options() {
          "So e=0.8 means we'll output at most 180%% of exact count and at "
          "least 55%% of exact count. "
          "Lower value means more precise.");
-  myopt2("-r", "--r-thresh-pivot", r_thresh_pivot, atof,
-         "Controls the ratio between the threshold and pivot. Default of 1.52.");
+  myopt2("-r", "--r-thresh-pivot", r_thresh_pivot, stod,
+         "Controls the ratio between the threshold and pivot. Default of 1.6.");
   myopt2(
       "-d", "--delta", delta, stod,
       "Confidence parameter, i.e. how sure are we of the result? "
@@ -152,22 +152,22 @@ void add_unigen_options() {
       "So d=0.2 means we are 80%% sure the count is within range as specified "
       "by epsilon. "
       "The lower, the higher confidence we have in the count.");
-  myopt("--kappa", kappa, atof, "Uniformity parameter (see TACAS-15 paper)");
+  myopt("--kappa", kappa, stod, "Uniformity parameter (see TACAS-15 paper)");
 
-  myopt("--arjun", do_arjun, atoi, "Use arjun to minimize sampling set");
-  myopt("--sparse", sparse, atoi, "Generate sparse XORs when possible");
-  myopt("--reusemodels", reuse_models, atoi,
+  myopt("--arjun", do_arjun, stoi, "Use arjun to minimize sampling set");
+  myopt("--sparse", sparse, stoi, "Generate sparse XORs when possible");
+  myopt("--reusemodels", reuse_models, stoi,
         "Reuse models while counting solutions");
-  myopt("--verbanbcls", verb_banning_cls, atoi,
+  myopt("--verbanbcls", verb_banning_cls, stoi,
         "Print banning clause + xor clauses. Highly verbose.");
-  myopt("--simplify", simplify, atoi, "Simplify agressiveness");
-  myopt("--velimratio", var_elim_ratio, atof,
+  myopt("--simplify", simplify, stoi, "Simplify agressiveness");
+  myopt("--velimratio", var_elim_ratio, stod,
         "Variable elimination ratio for each simplify run");
-  myopt("--samples", num_samples, atoi, "Number of random samples to generate");
-  myopt("--multisample", multisample, atoi,
+  myopt("--samples", num_samples, stoi, "Number of random samples to generate");
+  myopt("--multisample", multisample, stoi,
         "Return multiple samples from each call");
   myopt("--sampleout", sample_fname, string, "Write samples to this file");
-  myopt("--verbsamplercls", verb_sampler_cls, atoi,
+  myopt("--verbsamplercls", verb_sampler_cls, stoi,
         "Print XOR constraints added for sampling");
 
   program.add_argument("inputfile").remaining().help("input CNF");
@@ -201,7 +201,7 @@ void parse_file(const std::string& filename, T* reader) {
   DimacsParser<StreamBuffer<gzFile, CMSat::GZ>, T> parser(reader, nullptr, 0,
                                                           fg);
 #endif
-  if (in == nullptr) {
+  if (!in) {
     std::cout << "ERROR! Could not open file '" << filename
               << "' for reading: " << strerror(errno) << endl;
     std::exit(-1);
@@ -237,7 +237,7 @@ void parse_file(const std::string& filename, T* reader) {
 }
 
 void mycallback(const std::vector<int>& solution, void* file) {
-  std::ostream* os = (std::ostream*)file;
+  std::ostream* os = static_cast<std::ostream*>(file);
   for (uint32_t i = 0; i < solution.size(); i++) {
     (*os) << solution[i] << " ";
   }
@@ -343,8 +343,7 @@ int main(int argc, char** argv) {
     for (const auto& c : cnf.red_clauses) appmc->add_red_clause(c);
     appmc->set_multiplier_weight(cnf.multiplier_weight);
     print_final_indep_set(cnf.sampl_vars, orig_sampl_vars.size());
-    cout << "c o [arjun] Arjun finished. T: " << (cpuTime() - my_time) <<
-    endl;
+    cout << "c o [arjun] Arjun finished. T: " << (cpuTime() - my_time) << endl;
   } else {
     parse_file(fname, appmc);
     sampling_vars_orig = appmc->get_sampl_vars();
@@ -365,7 +364,8 @@ int main(int argc, char** argv) {
   // Original delta from paper
   // appmc->set_delta(std::min(0.1, epsilon/4));
 
-  // Hack to disable multisampling in unigen, for a fairer comparison with unisamp.
+  // Hack to disable multisampling in unigen, for a fairer comparison with
+  // unisamp.
   unigen->set_multisample(0);
 
   auto sol_count = appmc->count();

@@ -65,7 +65,7 @@ class UniG
   void set_verb_sampler_cls(bool verb_sampler_cls);
   void set_force_sol_extension(bool force_sol_extension);
   void set_verbosity(uint32_t verb);
-  void set_callback(UniGen::callback f, void* data);
+  void set_callback(UniGen::callback f, void* data = nullptr);
   void set_full_sampling_vars(const std::vector<uint32_t>& vars);
   void set_empty_sampling_vars(const std::vector<uint32_t>& vars);
 
@@ -83,7 +83,7 @@ class UniG
   ////////////////////////////
   // Do not bother with this, it's private
   ////////////////////////////
-  UniGenPrivateData* data;
+  std::unique_ptr<UniGenPrivateData> data;
 };
 
 }  // namespace UniGen

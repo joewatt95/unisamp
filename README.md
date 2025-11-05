@@ -59,7 +59,7 @@ int main () {
     auto appmc = new ApproxMC::AppMC;
     auto unigen = new UniG(appmc);
     appmc->set_verbosity(verbosity);
-    unigen->set_callback(mycallback, NULL);
+    unigen->set_callback(mycallback, nullptr);
     vector<Lit> lits;
 
     appmc->add_variables(3);

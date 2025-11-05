@@ -35,9 +35,9 @@ THE SOFTWARE.
 
 struct PySampler {
     PyObject_HEAD
-    UniGen::UniG* unig;
-    PyObject* sample_list = NULL;
-    ApproxMC::AppMC* appmc;
+    UniGen::UniG* unig = nullptr;
+    PyObject* sample_list = nullptr;
+    ApproxMC::AppMC* appmc = nullptr;
 
     // config
     int verbosity = 0;
@@ -73,20 +73,20 @@ Create Sampler object.\n\
 
 void pybinding_callback(const std::vector<int>& solution, void *self_in)
 {
-    PySampler* self = (PySampler*) self_in;
+    PySampler* self = static_cast<PySampler*>(self_in);
     if (self->error_during_callback) return;
     if (self->samples_generated >= self->samples_needed) return;
 
     PyObject* sample = PyList_New(solution.size());
-    if (sample == NULL) {
+    if (sample == nullptr) {
         self->error_during_callback = true;
         PyErr_SetString(PyExc_SystemError, "failed to create a list");
         return;
     }
 
     for (unsigned int i = 0; i < solution.size(); i++) {
-        PyObject *lit = PyLong_FromLong((long)solution[i]);
-        if (lit == NULL) {
+        PyObject *lit = PyLong_FromLong(static_cast<long>(solution[i]));
+        if (lit == nullptr) {
             self->error_during_callback = true;
             PyErr_SetString(PyExc_SystemError, "failed to create a list");
             return;
@@ -103,23 +103,23 @@ void pybinding_callback(const std::vector<int>& solution, void *self_in)
 static int parse_sampling_set(PySampler *self, PyObject *sampling_set_obj)
 {
     PyObject *iterator = PyObject_GetIter(sampling_set_obj);
-    if (iterator == NULL) {
+    if (iterator == nullptr) {
         PyErr_SetString(PyExc_TypeError, "iterable object expected");
-        return NULL;
+        return nullptr;
     }
 
     PyObject *lit;
-    while ((lit = PyIter_Next(iterator)) != NULL) {
+    while ((lit = PyIter_Next(iterator)) != nullptr) {
         long val = PyLong_AsLong(lit);
         if (val <= 0) {
             PyErr_SetString(PyExc_ValueError, "Sampling set must be positive numbers");
-            return NULL;
+            return nullptr;
         }
         if (val > std::numeric_limits<int>::max()/2
             || val < std::numeric_limits<int>::min()/2
         ) {
             PyErr_Format(PyExc_ValueError, "integer %ld is too small or too large", val);
-            return NULL;
+            return nullptr;
         }
 
         self->sampling_set.push_back(val - 1);
@@ -127,9 +127,9 @@ static int parse_sampling_set(PySampler *self, PyObject *sampling_set_obj)
     }
     Py_DECREF(iterator);
 
-    for(const auto& v: self->sampling_set) if (v >= (long int)self->appmc->nVars()) {
-        PyErr_Format(PyExc_ValueError, "Sampling set provided is incorrect, it has a variable in it, %li, that is larger than the total number of variables: %li", v+1, (long int)self->appmc->nVars());
-        return NULL;
+    for(const auto& v: self->sampling_set) if (v >= static_cast<long int>(self->appmc->nVars())) {
+        PyErr_Format(PyExc_ValueError, "Sampling set provided is incorrect, it has a variable in it, %li, that is larger than the total number of variables: %li", v+1, static_cast<long int>(self->appmc->nVars()));
+        return nullptr;
     }
 
     return 1;
@@ -149,7 +149,7 @@ static void setup_sampler(PySampler *self, PyObject *args, PyObject *kwds)
     self->delta = self->appmc->get_delta();
     self->kappa = self->unig->get_kappa();
 
-    static char* kwlist[] = {"verbosity", "seed", "epsilon", "delta", "kappa", "multisample", NULL};
+    static char* kwlist[] = {"verbosity", "seed", "epsilon", "delta", "kappa", "multisample", nullptr};
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iIdddp", kwlist,
         &self->verbosity, &self->seed, &self->epsilon, &self->delta, &self->kappa, &self->multisample))
     {
@@ -216,14 +216,14 @@ static int convert_lit_to_sign_and_var(PyObject* lit, long& var, bool& sign)
 static int parse_clause(PySampler *self, PyObject *clause, std::vector<CMSat::Lit>& lits)
 {
     PyObject *iterator = PyObject_GetIter(clause);
-    if (iterator == NULL) {
+    if (iterator == nullptr) {
         PyErr_SetString(PyExc_TypeError, "iterable object expected");
         return 0;
     }
 
     PyObject *lit;
     long int max_var = 0;
-    while ((lit = PyIter_Next(iterator)) != NULL) {
+    while ((lit = PyIter_Next(iterator)) != nullptr) {
         long var;
         bool sign;
         int ret = convert_lit_to_sign_and_var(lit, var, sign);
@@ -237,8 +237,8 @@ static int parse_clause(PySampler *self, PyObject *clause, std::vector<CMSat::Li
         lits.push_back(CMSat::Lit(var, sign));
     }
 
-    if (!lits.empty() && max_var >= (long int)self->appmc->nVars()) {
-        self->appmc->new_vars(max_var-(long int)self->appmc->nVars()+1);
+    if (!lits.empty() && max_var >= static_cast<long int>(self->appmc->nVars())) {
+        self->appmc->new_vars(max_var-static_cast<long int>(self->appmc->nVars())+1);
     }
 
     Py_DECREF(iterator);
@@ -271,14 +271,14 @@ Add a clause to the solver.\n\
 
 static PyObject* add_clause(PySampler *self, PyObject *args, PyObject *kwds)
 {
-    static char* kwlist[] = {"clause", NULL};
+    static char* kwlist[] = {"clause", nullptr};
     PyObject *clause;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O", kwlist, &clause)) {
-        return NULL;
+        return nullptr;
     }
 
     if (_add_clause(self, clause) == 0 ) {
-        return NULL;
+        return nullptr;
     }
 
     Py_INCREF(Py_None);
@@ -290,11 +290,11 @@ static int parse_cell_hash_count(PyObject* obj, ApproxMC::SolCount& sol_count)
 {
     if (!PyTuple_Check(obj)) {
         PyErr_SetString(PyExc_SystemError, "The hash&cell count must be a tuple");
-        return NULL;
+        return nullptr;
     }
     if (PyTuple_Size(obj) != 2) {
         PyErr_SetString(PyExc_SystemError, "The hash&cell count must be a tuple of size 2");
-        return NULL;
+        return nullptr;
     }
 
     PyObject* tmp = PyTuple_GetItem(obj, 0);
@@ -343,59 +343,59 @@ static PyObject* sample(PySampler *self, PyObject *args, PyObject *kwds)
 {
     if (self->called_already) {
         PyErr_SetString(PyExc_SystemError, "You can only call sample() once");
-        return NULL;
+        return nullptr;
     }
     self->called_already = true;
 
-    PyObject* sampling_set_obj = NULL;
-    PyObject* cell_hash_count_obj = NULL;
-    static char* kwlist[] = {"num", "sampling_set", "cell_hash_count", NULL};
+    PyObject* sampling_set_obj = nullptr;
+    PyObject* cell_hash_count_obj = nullptr;
+    static char* kwlist[] = {"num", "sampling_set", "cell_hash_count", nullptr};
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|IOO", kwlist,
     	&self->samples_needed, &sampling_set_obj, &cell_hash_count_obj))
     {
-        return NULL;
+        return nullptr;
     }
 
-    if (sampling_set_obj != NULL && !parse_sampling_set(self, sampling_set_obj)) {
-        return NULL;
+    if (sampling_set_obj != nullptr && !parse_sampling_set(self, sampling_set_obj)) {
+        return nullptr;
     }
-    if (sampling_set_obj == NULL) {
+    if (sampling_set_obj == nullptr) {
         assert(self->sampling_set.empty());
         for(uint32_t i = 0; i < self->appmc->nVars(); i++) self->sampling_set.push_back(i);
     }
 
     ApproxMC::SolCount sol_count;
-    if (cell_hash_count_obj != NULL && !parse_cell_hash_count(cell_hash_count_obj, sol_count)) {
-        return NULL;
+    if (cell_hash_count_obj != nullptr && !parse_cell_hash_count(cell_hash_count_obj, sol_count)) {
+        return nullptr;
     }
 
 
     self->appmc->set_projection_set(self->sampling_set);
 
-    if (cell_hash_count_obj == NULL) {
+    if (cell_hash_count_obj == nullptr) {
     	sol_count = self->appmc->count();
     }
 
     self->sample_list = PyList_New(0);
-    if (self->sample_list == NULL) {
+    if (self->sample_list == nullptr) {
         PyErr_SetString(PyExc_SystemError, "failed to create a list");
-        return NULL;
+        return nullptr;
     }
     self->unig->set_full_sampling_vars(self->sampling_set);
     self->unig->sample(&sol_count, self->samples_needed);
 
     PyObject *result = PyTuple_New((Py_ssize_t) 3);
-    if (result == NULL) {
+    if (result == nullptr) {
         PyErr_SetString(PyExc_SystemError, "failed to create a tuple");
-        return NULL;
+        return nullptr;
     }
     if (self->error_during_callback) {
         PyErr_SetString(PyExc_SystemError, "We encountered an error during our callback system. Can't return samples.");
-        return NULL;
+        return nullptr;
     }
 
-    PyTuple_SET_ITEM(result, 0, PyLong_FromLong((long)sol_count.cellSolCount));
-    PyTuple_SET_ITEM(result, 1, PyLong_FromLong((long)sol_count.hashCount));
+    PyTuple_SET_ITEM(result, 0, PyLong_FromLong(static_cast<long>(sol_count.cellSolCount)));
+    PyTuple_SET_ITEM(result, 1, PyLong_FromLong(static_cast<long>(sol_count.hashCount)));
     PyTuple_SET_ITEM(result, 2, self->sample_list);
 
     return result;
@@ -403,25 +403,25 @@ static PyObject* sample(PySampler *self, PyObject *args, PyObject *kwds)
 
 /********** Python Bindings **********/
 static PyMethodDef PySampler_methods[] = {
-    {"sample",    (PyCFunction) sample,      METH_VARARGS | METH_KEYWORDS, sample_doc},
-    {"add_clause",(PyCFunction) add_clause,  METH_VARARGS | METH_KEYWORDS, add_clause_doc},
-    {NULL, NULL}  // Sentinel
+    {"sample",    static_cast<PyCFunction>(sample),      METH_VARARGS | METH_KEYWORDS, sample_doc},
+    {"add_clause",static_cast<PyCFunction>(add_clause),  METH_VARARGS | METH_KEYWORDS, add_clause_doc},
+    {nullptr, nullptr}  // Sentinel
 };
 
 static void PySampler_dealloc(PySampler* self)
 {
     delete self->unig;
     delete self->appmc;
-    Py_TYPE(self)->tp_free ((PyObject*) self);
+    Py_TYPE(self)->tp_free (static_cast<PyObject*>(self));
 }
 
 static int PySampler_init(PySampler *self, PyObject *args, PyObject *kwds)
 {
-    if (self->unig != NULL) {
+    if (self->unig) {
         delete self->unig;
     }
 
-    if (self->appmc != NULL) {
+    if (self->appmc) {
         delete self->appmc;
     }
 
@@ -440,11 +440,11 @@ static int PySampler_init(PySampler *self, PyObject *args, PyObject *kwds)
 
 static PyTypeObject pyunigen_PySamplerType =
 {
-    PyVarObject_HEAD_INIT(NULL, 0)  /*ob_size*/
+    PyVarObject_HEAD_INIT(nullptr, 0)  /*ob_size*/
     "pyunigen.Sampler",           /*tp_name*/
     sizeof(PySampler),                /*tp_basicsize*/
     0,                              /*tp_itemsize*/
-    (destructor)PySampler_dealloc,    /*tp_dealloc*/
+    static_cast<destructor>(PySampler_dealloc),    /*tp_dealloc*/
     0,                              /*tp_print*/
     0,                              /*tp_getattr*/
     0,                              /*tp_setattr*/
@@ -475,7 +475,7 @@ static PyTypeObject pyunigen_PySamplerType =
     0,                              /* tp_descr_get */
     0,                              /* tp_descr_set */
     0,                              /* tp_dictoffset */
-    (initproc)PySampler_init,         /* tp_init */
+    static_cast<initproc>(PySampler_init),         /* tp_init */
 };
 
 PyMODINIT_FUNC PyInit_pyunigen(void)
@@ -484,9 +484,9 @@ PyMODINIT_FUNC PyInit_pyunigen(void)
 
     pyunigen_PySamplerType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&pyunigen_PySamplerType) < 0) {
-        // Return NULL on Python3 and on Python2 with MODULE_INIT_FUNC macro
+        // Return nullptr on Python3 and on Python2 with MODULE_INIT_FUNC macro
         // In pure Python2: return nothing.
-        return NULL;
+        return nullptr;
     }
 
     static struct PyModuleDef moduledef = {
@@ -494,15 +494,15 @@ PyMODINIT_FUNC PyInit_pyunigen(void)
         MODULE_NAME,            /* m_name */
         MODULE_DOC,             /* m_doc */
         -1,                     /* m_size */
-        NULL,                   /* m_methods */
-        NULL,                   /* m_reload */
-        NULL,                   /* m_traverse */
-        NULL,                   /* m_clear */
-        NULL,                   /* m_free */
+        nullptr,                   /* m_methods */
+        nullptr,                   /* m_reload */
+        nullptr,                   /* m_traverse */
+        nullptr,                   /* m_clear */
+        nullptr,                   /* m_free */
     };
 
     m = PyModule_Create(&moduledef);
-    if (!m) return NULL;
+    if (!m) return nullptr;
 
     // Add the version string so users know what version of UniGen
     // they're using.
@@ -510,11 +510,11 @@ PyMODINIT_FUNC PyInit_pyunigen(void)
 #else
     if (PyModule_AddStringConstant(m, "__version__", UNIGEN_FULL_VERSION) == -1) {
         Py_DECREF(m);
-        return NULL;
+        return nullptr;
     }
     if (PyModule_AddStringConstant(m, "VERSION", UNIGEN_FULL_VERSION) == -1) {
         Py_DECREF(m);
-        return NULL;
+        return nullptr;
     }
 #endif
 
@@ -522,7 +522,7 @@ PyMODINIT_FUNC PyInit_pyunigen(void)
     Py_INCREF(&pyunigen_PySamplerType);
     if (PyModule_AddObject(m, "Sampler", (PyObject *)&pyunigen_PySamplerType)) {
         Py_DECREF(m);
-        return NULL;
+        return nullptr;
     }
 
     return m;

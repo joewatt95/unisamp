@@ -28,9 +28,6 @@
 
 #include "sampler.h"
 
-#include <string.h>
-#include <sys/stat.h>
-
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -39,6 +36,7 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <random>
 #include <set>
 
@@ -51,17 +49,18 @@ using std::cerr;
 using std::cout;
 using std::endl;
 using std::map;
+using std::optional;
 using std::set;
 
 Hash Sampler::add_hash(uint32_t hash_index) {
-  const string randomBits =
+  const auto randomBits =
       gen_rnd_bits(appmc->get_sampling_set().size(), hash_index);
 
   vector<uint32_t> vars;
-  for (uint32_t j = 0; j < appmc->get_sampling_set().size(); j++) {
-    if (randomBits[j] == '1') {
-      vars.push_back(appmc->get_sampling_set()[j]);
-    }
+  uint32_t i = 0;
+  for (const auto& sampling_var : appmc->get_sampling_set()) {
+    if (randomBits[i] == '1') vars.push_back(sampling_var);
+    i++;
   }
 
   solver->new_var();
@@ -88,21 +87,21 @@ void Sampler::ban_one(const uint32_t act_var, const vector<lbool>& model) {
 uint64_t Sampler::add_glob_banning_cls(const HashesModels* hm,
                                        const uint32_t act_var,
                                        const uint32_t num_hashes) {
-  if (hm == NULL) return 0;
+  if (!hm) return 0;
   assert(act_var != std::numeric_limits<uint32_t>::max());
   assert(num_hashes != std::numeric_limits<uint32_t>::max());
 
   uint64_t repeat = 0;
   vector<Lit> lits;
-  for (uint32_t i = 0; i < hm->glob_model.size(); i++) {
-    const SavedModel& sm = hm->glob_model[i];
+  for (const auto& sm : hm->glob_model) {
     // Model was generated with 'sm.hash_num' active
     // We will have 'num_hashes' hashes active
 
     if (sm.hash_num >= num_hashes) {
       ban_one(act_var, sm.model);
       repeat++;
-    } else if ((int)num_hashes - (int)sm.hash_num < 9) {
+    } else if (static_cast<int>(num_hashes) - static_cast<int>(sm.hash_num) <
+               9) {
       // Model has to fit all hashes
       bool ok = true;
       for (const auto& h : hm->hashes) {
@@ -206,8 +205,8 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
     // Sampling -- output a random sample of N solutions
     if (solutions >= minSolutions) {
       assert(minSolutions > 0);
-      vector<size_t> modelIndices;
-      for (uint32_t i = 0; i < models.size(); i++) modelIndices.push_back(i);
+      vector<size_t> modelIndices(models.size());
+      std::iota(modelIndices.begin(), modelIndices.end(), 0);
       std::shuffle(modelIndices.begin(), modelIndices.end(), randomEngine);
 
       for (uint32_t i = 0; i < sols_to_return(solutions); i++) {
@@ -474,13 +473,13 @@ void Sampler::generate_samples(const uint32_t num_samples_needed) {
         bounded_sol_count(
             std::numeric_limits<uint32_t>::max()  // max no. solutions
             ,
-            NULL  // assumps is empty
+            nullptr  // assumps is empty
             ,
             0  // number of hashes (information only)
             ,
             1  // min num. solutions
             ,
-            NULL  // gobal model (would be banned)
+            nullptr  // gobal model (would be banned)
             ,
             &out_solutions)
             .solutions;
@@ -582,8 +581,6 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   // Original thresh from paper
   // hiThresh = 2 + 4 * ceil(thresh_sampler_gen);
 
-  loThresh = 1;
-
   // cout << "epsilon = " << conf.epsilon << endl;
   // cout << "r_thresh_pivot = " << conf.r_thresh_pivot << endl;
 
@@ -611,13 +608,13 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
         bounded_sol_count(
             std::numeric_limits<uint32_t>::max()  // max no. solutions
             ,
-            NULL  // assumps is empty
+            nullptr  // assumps is empty
             ,
             0  // number of hashes (information only)
             ,
             1  // min num. solutions
             ,
-            NULL  // gobal model (would be banned)
+            nullptr  // gobal model (would be banned)
             ,
             &out_solutions)
             .solutions;
@@ -672,7 +669,7 @@ void Sampler::reset_working_solver() {
   // We manually "prime" the new solver with the level-0
   // assignments it missed.
   std::vector<CMSat::Lit> units = base_solver->get_zero_assigned_lits();
-    
+
   // This adds the '[1 = TRUE]' assignment back in.
   for (const CMSat::Lit& lit : units) new_solver->add_clause({lit});
 
@@ -695,8 +692,7 @@ void Sampler::reset_working_solver() {
 
 void Sampler::check_and_perform_reset() {
   // 1. Check if the *current* window is full
-  if (samples_in_window < current_window_size)
-    return;  // Window not full yet
+  if (samples_in_window < current_window_size) return;  // Window not full yet
 
   // 2. The window is full. Calculate this window's average time.
   double recent_avg = current_window_total_time / samples_in_window;
@@ -729,7 +725,8 @@ void Sampler::check_and_perform_reset() {
     // --- FAILED: We are too slow ---
 
     // Is this solver still in the "Nursery"?
-    // We define "Nursery" as any solver that hasn't been "promoted" at least once.
+    // We define "Nursery" as any solver that hasn't been "promoted" at least
+    // once.
     const bool is_in_nursery = (current_window_size <= WINDOW_MIN);
     if (is_in_nursery)
       // "Nursery" failure = Hard Reset
@@ -747,8 +744,7 @@ void Sampler::check_and_perform_reset() {
         int new_window_size = static_cast<int>(current_window_size / 2.0);
         current_window_size =
             std::clamp(new_window_size, WINDOW_MIN, WINDOW_MAX);
-      }
-      else
+      } else
         // "MAJOR" FAILURE (Hard Reset)
         reset_working_solver();
     }
@@ -794,16 +790,17 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
 
 vector<int> Sampler::get_solution_ints(const vector<lbool>& model) {
   vector<int> solution;
-  std::uniform_int_distribution<uint32_t> dist{0, 1};
+  // std::bernoulli_distribution dist(0.5);
   for (const uint32_t var : conf.full_sampling_vars) {
     assert(model[var] != l_Undef);
-    solution.push_back(((model[var] != l_True) ? -1 : 1) * ((int)var + 1));
+    solution.push_back(((model[var] != l_True) ? -1 : 1) *
+                       (static_cast<int>(var) + 1));
   }
   return solution;
 }
 
 bool Sampler::gen_rhs() {
-  std::uniform_int_distribution<uint32_t> dist{0, 1};
+  std::bernoulli_distribution dist(0.5);
   bool rhs = dist(randomEngine);
   // cout << "rnd rhs:" << (int)rhs << endl;
   return rhs;
@@ -827,11 +824,11 @@ string Sampler::gen_rnd_bits(const uint32_t size,
 
 void Sampler::print_xor(const vector<uint32_t>& vars, const uint32_t rhs) {
   cout << "c o [unig] Added XOR ";
-  for (size_t i = 0; i < vars.size(); i++) {
-    cout << vars[i] + 1;
-    if (i < vars.size() - 1) {
-      cout << " + ";
-    }
+  bool first = true;
+  for (const auto& var : vars) {
+    if (!first) cout << " + ";
+    cout << var + 1;
+    first = false;
   }
   cout << " = " << (rhs ? "True" : "False") << endl;
 }
@@ -849,9 +846,7 @@ uint32_t Sampler::sols_to_return(uint32_t numSolutions) {
 void Sampler::check_model(const vector<lbool>& model,
                           const HashesModels* const hm,
                           const uint32_t hashCount) {
-  for (uint32_t var : appmc->get_sampling_set()) {
-    assert(model[var] != l_Undef);
-  }
+  for (uint32_t var : appmc->get_sampling_set()) assert(model[var] != l_Undef);
 
   if (!hm) return;
 

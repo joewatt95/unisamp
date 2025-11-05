@@ -101,15 +101,18 @@ class Sampler {
   double current_slowdown_threshold;
 
   // --- Heuristic Constants (these are your new tuning knobs) ---
-  static constexpr int WINDOW_MIN = 10;   // Start with a hyper-reactive 10-sample window
+  static constexpr int WINDOW_MIN =
+      10;  // Start with a hyper-reactive 10-sample window
   static constexpr int WINDOW_MAX = 200;  // Don't let the window grow forever
   static constexpr double WINDOW_GROW_FACTOR =
       1.5;  // How fast to grow the window (e.g., 10, 15, 22, 33...)
 
-  static constexpr double THRESHOLD_MIN = 1.8;  // Start with a very strict 1.8x slowdown
+  static constexpr double THRESHOLD_MIN =
+      1.8;  // Start with a very strict 1.8x slowdown
   static constexpr double THRESHOLD_MAX =
       3.0;  // Don't let the threshold become too lenient
-  static constexpr double THRESHOLD_RELAX_STEP = 0.2;  // How much to relax the threshold
+  static constexpr double THRESHOLD_RELAX_STEP =
+      0.2;  // How much to relax the threshold
 
   // This defines the line between a "slip-up" and a "disaster".
   // 1.5x means a failure is "Major" if it's 50% worse than the threshold.
@@ -133,14 +136,14 @@ class Sampler {
 
  private:
   uint32_t startiter;
-  uint32_t loThresh;
+  uint32_t loThresh = 1;
   uint32_t hiThresh;
   double thresh_sampler_gen;
 
   Config conf;
   string gen_rnd_bits(const uint32_t size, const uint32_t numhashes);
   uint32_t sols_to_return(uint32_t numSolutions);
-  void add_Sampler_options();
+  void add_sampler_options();
   bool gen_rhs();
   uint32_t gen_n_samples(const uint32_t samples,
                          uint32_t* lastSuccessfulHashOffset,
@@ -159,13 +162,14 @@ class Sampler {
 
   SolNum bounded_sol_count(uint32_t maxSolutions, const vector<Lit>* assumps,
                            const uint32_t hashCount, uint32_t minSolutions = 1,
-                           HashesModels* hm = NULL,
-                           vector<vector<int>>* out_solutions = NULL);
+                           HashesModels* hm = nullptr,
+                           vector<vector<int>>* out_solutions = nullptr);
   bool bounded_sol_count_unisamp(const vector<Lit>* assumps,
                                  const uint32_t hashCount,
-                                 HashesModels* hm = NULL,
-                                 vector<vector<int>>* out_solutions = NULL);
+                                 HashesModels* hm = nullptr,
+                                 vector<vector<int>>* out_solutions = nullptr);
   vector<Lit> set_num_hashes(uint32_t num_wanted, map<uint64_t, Hash>& hashes);
+
   void simplify();
 
   ////////////////
@@ -178,7 +182,7 @@ class Sampler {
                    const uint32_t hashCount);
   bool check_model_against_hash(const Hash& h, const vector<lbool>& model);
   uint64_t add_glob_banning_cls(
-      const HashesModels* glob_model = NULL,
+      const HashesModels* glob_model = nullptr,
       const uint32_t act_var = std::numeric_limits<uint32_t>::max(),
       const uint32_t num_hashes = std::numeric_limits<uint32_t>::max());
 
