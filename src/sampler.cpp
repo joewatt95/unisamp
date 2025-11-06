@@ -368,10 +368,10 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
                              const uint32_t num_samples) {
   conf = _conf;
 
-  // load_and_initialize();
+  load_and_initialize();
 
-  appmc_solver = appmc->get_solver();
-  solver = appmc_solver;
+  // appmc_solver = appmc->get_solver();
+  // solver = appmc_solver;
 
   orig_num_vars = appmc_solver->nVars();
   startTime = cpuTimeTotal();
@@ -644,12 +644,27 @@ void Sampler::reset_heuristic_params() {
   current_slowdown_threshold = THRESHOLD_MIN;
 }
 
+void my_copy_solver_to_solver(SATSolver* solver, SATSolver* solver2) {
+  solver2->new_vars(solver->nVars());
+  solver->start_getting_constraints(false);
+  std::vector<Lit> c;
+  bool is_xor;
+  bool rhs;
+  bool ret = true;
+  while (ret) {
+    ret = solver->get_next_constraint(c, is_xor, rhs);
+    if (!ret) break;
+    if (!is_xor) solver2->add_clause(c);
+  }
+  solver->end_getting_constraints();
+}
+
 void Sampler::load_and_initialize() {
   // ... (all the solver borrowing logic is the same) ...
   appmc_solver = appmc->get_solver();
   is_using_appmc_solver = true;
 
-  base_solver = std::make_unique<CMSat::SATSolver>();
+  base_solver = std::make_unique<SATSolver>();
   copy_solver_to_solver(appmc_solver, base_solver.get());
 
   // --- Initialize Heuristics ---
@@ -658,25 +673,32 @@ void Sampler::load_and_initialize() {
 
 void Sampler::reset_working_solver() {
   // 1. Create a new, "cold" solver that *we* will own
-  auto new_solver = std::make_unique<CMSat::SATSolver>();
+  auto new_solver = std::make_unique<SATSolver>();
+
+  new_solver->set_seed(appmc->get_seed());
+
+  // approxmc sets these options.
+  // new_solver->set_up_for_scalmc();
+  // new_solver->set_allow_otf_gauss(); 
 
   // 2. Perform the FAST "simplified" copy.
   // This is fast, but we know it's "dumb" - it's missing
   // the '1 0' clause AND the '1 = TRUE' assignment.
-  copy_simp_solver_to_solver(base_solver.get(), new_solver.get());
+  copy_solver_to_solver(base_solver.get(), new_solver.get());
 
   // 3. --- THE FIX for Unit Propagation ---
   // We manually "prime" the new solver with the level-0
   // assignments it missed.
-  std::vector<CMSat::Lit> units = base_solver->get_zero_assigned_lits();
+  // std::vector<CMSat::Lit> units = base_solver->get_zero_assigned_lits();
 
   // This adds the '[1 = TRUE]' assignment back in.
-  for (const CMSat::Lit& lit : units) new_solver->add_clause({lit});
+  // for (const CMSat::Lit& lit : units) new_solver->add_clause({lit});
 
   // 4. Take ownership. The old `working_solver` (if any) is auto-deleted.
   working_solver = std::move(new_solver);
 
-  solver = working_solver.get();
+  // solver = working_solver.get();
+  // simplify();
 
   // 5. SWITCH THE FLAG! We are now done with the ApproxMC solver.
   is_using_appmc_solver = false;
@@ -756,11 +778,14 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
   uint32_t num_samples = 0;
 
   while (num_samples < num_samples_needed) {
+    // if (num_samples > 0 && num_samples % 100 == 0)
+    reset_working_solver();
+
     // 1. Check if the current window is full and if we need to reset.
     // check_and_perform_reset();
 
     // 2. Decide which solver to use for this iteration.
-    // solver = is_using_appmc_solver ? appmc_solver : working_solver.get();
+    solver = is_using_appmc_solver ? appmc_solver : working_solver.get();
 
     // 3. Start the timer.
     // auto start = std::chrono::high_resolution_clock::now();
