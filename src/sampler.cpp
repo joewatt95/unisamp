@@ -778,8 +778,7 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
   uint32_t num_samples = 0;
 
   while (num_samples < num_samples_needed) {
-    // if (num_samples > 0 && num_samples % 100 == 0)
-    reset_working_solver();
+    // if (num_samples > 0 && num_samples % 100 == 0) reset_working_solver();
 
     // 1. Check if the current window is full and if we need to reset.
     // check_and_perform_reset();
