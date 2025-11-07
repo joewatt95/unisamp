@@ -646,7 +646,7 @@ void Sampler::reset_heuristic_params() {
 
 void my_copy_solver_to_solver(SATSolver* solver, SATSolver* solver2) {
   solver2->new_vars(solver->nVars());
-  solver->start_getting_constraints(false);
+  solver->start_getting_constraints(true);
   std::vector<Lit> c;
   bool is_xor;
   bool rhs;
@@ -665,7 +665,7 @@ void Sampler::load_and_initialize() {
   is_using_appmc_solver = true;
 
   base_solver = std::make_unique<SATSolver>();
-  copy_solver_to_solver(appmc_solver, base_solver.get());
+  my_copy_solver_to_solver(appmc_solver, base_solver.get());
 
   // --- Initialize Heuristics ---
   reset_heuristic_params();
@@ -684,7 +684,7 @@ void Sampler::reset_working_solver() {
   // 2. Perform the FAST "simplified" copy.
   // This is fast, but we know it's "dumb" - it's missing
   // the '1 0' clause AND the '1 = TRUE' assignment.
-  copy_solver_to_solver(base_solver.get(), new_solver.get());
+  my_copy_solver_to_solver(base_solver.get(), new_solver.get());
 
   // 3. --- THE FIX for Unit Propagation ---
   // We manually "prime" the new solver with the level-0
@@ -798,8 +798,6 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
 
     num_samples += ok;
 
-    if (appmc->get_simplify() >= 1) simplify();
-
     // 5. Stop the timer.
     // auto end = std::chrono::high_resolution_clock::now();
     // std::chrono::duration<double> elapsed = end - start;
@@ -807,6 +805,8 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
     // 6. Update the timers for the *next* check
     // current_window_total_time += elapsed.count();
     // samples_in_window++;
+
+    if (appmc->get_simplify() >= 1) simplify();
   }
 
   return num_samples;
