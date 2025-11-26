@@ -367,26 +367,26 @@ message(STATUS "PROJECT_VERSION_PATCH: ${PROJECT_VERSION_PATCH}")
 # ----------
 # manpage
 # ----------
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" AND NOT EMSCRIPTEN)
-    find_program(HELP2MAN_FOUND help2man)
-    if (HELP2MAN_FOUND)
-        ADD_CUSTOM_TARGET(man_unigen ALL DEPENDS unigen-bin)
-        ADD_CUSTOM_COMMAND(
-            POST_BUILD
-            TARGET man_unigen
-            COMMAND help2man
-            ARGS --version-string=${UNIGEN_FULL_VERSION} --help-option="-h" $<TARGET_FILE:unigen-bin> -o ${CMAKE_CURRENT_BINARY_DIR}/unigen.1
-        )
-        INSTALL(
-            FILES ${CMAKE_CURRENT_BINARY_DIR}/unigen.1
-            DESTINATION ${CMAKE_INSTALL_PREFIX}/man/man1)
-        message(STATUS "Manpage will be created and installed")
-    else()
-        message(STATUS "Cannot find help2man, not creating manpage")
-    endif()
-else()
-    message(STATUS "Not on Linux, not creating manpage")
-endif()
+# if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" AND NOT EMSCRIPTEN)
+#     find_program(HELP2MAN_FOUND help2man)
+#     if (HELP2MAN_FOUND)
+#         ADD_CUSTOM_TARGET(man_unigen ALL DEPENDS unigen-bin)
+#         ADD_CUSTOM_COMMAND(
+#             POST_BUILD
+#             TARGET man_unigen
+#             COMMAND help2man
+#             ARGS --version-string=${UNIGEN_FULL_VERSION} --help-option="-h" $<TARGET_FILE:unigen-bin> -o ${CMAKE_CURRENT_BINARY_DIR}/unigen.1
+#         )
+#         INSTALL(
+#             FILES ${CMAKE_CURRENT_BINARY_DIR}/unigen.1
+#             DESTINATION ${CMAKE_INSTALL_PREFIX}/man/man1)
+#         message(STATUS "Manpage will be created and installed")
+#     else()
+#         message(STATUS "Cannot find help2man, not creating manpage")
+#     endif()
+# else()
+#     message(STATUS "Not on Linux, not creating manpage")
+# endif()
 
 #query definitions
 get_directory_property( DirDefs DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS )
