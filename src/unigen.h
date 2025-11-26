@@ -42,7 +42,7 @@ class SolCount;
 
 namespace UniGen {
 
-typedef std::function<void(const std::vector<int>& solution, void* data)>
+typedef std::function<void(const std::vector<int>& solution, uint32_t num_tries, void* data)>
     callback;
 
 struct UniGenPrivateData;

@@ -211,7 +211,7 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
 
       for (uint32_t i = 0; i < sols_to_return(solutions); i++) {
         const auto& model = models.at(modelIndices.at(i));
-        callback_func(get_solution_ints(model), callback_func_data);
+        callback_func(get_solution_ints(model), 1, callback_func_data);
       }
     }
   }
@@ -235,6 +235,7 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
 // obtained from bsat.
 bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
                                         const uint32_t hashCount,
+                                        const uint32_t num_tries,
                                         HashesModels* hm,
                                         vector<vector<int>>* out_solutions) {
   verb_print(1,
@@ -316,7 +317,7 @@ bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
         std::uniform_int_distribution<size_t>(0, hiThresh)(randomEngine);
     if (index < models.size()) {
       const auto& model = models.at(index);
-      callback_func(get_solution_ints(model), callback_func_data);
+      callback_func(get_solution_ints(model), num_tries, callback_func_data);
       ok = true;
     }
   }
@@ -490,7 +491,7 @@ void Sampler::generate_samples(const uint32_t num_samples_needed) {
       auto it = out_solutions.begin();
       for (uint32_t j = uid(randomEngine); j > 0; --j) ++it;
       samples++;
-      callback_func(*it, callback_func_data);
+      callback_func(*it, 1, callback_func_data);
     }
   }
 
@@ -625,7 +626,7 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
       auto it = out_solutions.begin();
       for (uint32_t j = uid(randomEngine); j > 0; --j) ++it;
       ++num_samples;
-      callback_func(*it, callback_func_data);
+      callback_func(*it, 1, callback_func_data);
     }
   }
 
@@ -775,7 +776,10 @@ void Sampler::check_and_perform_reset() {
 
 uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
   SparseData sparse_data(-1);
+  // Total number of samples obtained.
   uint32_t num_samples = 0;
+  // Number of tries so far for current sample.
+  uint32_t num_tries = 0;
 
   while (num_samples < num_samples_needed) {
     // if (num_samples > 0 && num_samples % 100 == 0) reset_working_solver();
@@ -794,9 +798,17 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
     // For unisamp, startiter represents m, which we directly use as our hash
     // count
     const vector<Lit> assumps = set_num_hashes(startiter, hashes);
-    const bool ok = bounded_sol_count_unisamp(&assumps, startiter);
+    num_tries++;
+    const bool ok = bounded_sol_count_unisamp(&assumps, startiter, num_tries);
+    if (ok) {
+      num_samples++;
 
-    num_samples += ok;
+      cout << "c o [unig] Found solution " << num_samples << " (out of "
+           << num_samples_needed << ") after a total of " << num_tries
+           << " tries" << endl;
+
+      num_tries = 0;
+    }
 
     // 5. Stop the timer.
     // auto end = std::chrono::high_resolution_clock::now();

@@ -236,12 +236,15 @@ void parse_file(const std::string& filename, T* reader) {
   }
 }
 
-void mycallback(const std::vector<int>& solution, void* file) {
+void mycallback(const std::vector<int>& solution, const uint32_t num_tries,
+                void* file) {
   std::ostream* os = static_cast<std::ostream*>(file);
-  for (uint32_t i = 0; i < solution.size(); i++) {
-    (*os) << solution[i] << " ";
-  }
-  (*os) << "0" << endl;
+
+  (*os) << "Total number of tries: " << num_tries << endl;
+
+  (*os) << "Solution:" << endl;
+  for (uint32_t i = 0; i < solution.size(); i++) (*os) << solution[i] << " ";
+  (*os) << "0" << endl << endl;
 }
 
 inline double stats_line_percent(double num, double total) {

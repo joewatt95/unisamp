@@ -42,12 +42,12 @@ class SolCount;
 
 namespace UniSamp {
 
-typedef std::function<void(const std::vector<int>& solution, void* data)>
+typedef std::function<void(const std::vector<int>& solution, uint32_t num_tries, void* data)>
     callback;
 
 struct UniSampPrivateData;
 #ifdef _WIN32
-class __declspec(dllexport) UniG
+class __declspec(dllexport) UniS
 #else
 class UniS
 #endif
