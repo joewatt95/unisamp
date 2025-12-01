@@ -24,15 +24,15 @@
     },
     {
       "name": "arjun",
-      "version>=": "2.6.1-9130e58"
+      "version>=": "2.6.1-d5fff41"
     },
     {
       "name": "cryptominisat",
-      "version>=": "5.13.0-0ab1e44"
+      "version>=": "5.13.0-34ec41b"
     },
     {
       "name": "sbva",
-      "version>=": "2025.06-0faa08c"
+      "version>=": "2025.11-65993db"
     }
   ]
 }

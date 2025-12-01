@@ -1,6 +1,6 @@
 {
   "name": "cadical",
-  "version-string": "2.0.0-a35c4b9",
+  "version-string": "2.0.0-f5ac6ff",
   "homepage": "https://github.com/meelgroup/cadical",
   "description": "Simple CDCL satisfiability solver",
   "dependencies": [

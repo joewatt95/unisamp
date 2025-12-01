@@ -1,6 +1,6 @@
 {
   "name": "sbva",
-  "version-string": "2025.06-0faa08c",
+  "version-string": "2025.11-65993db",
   "homepage": "https://github.com/meelgroup/sbva",
   "description": "Tool for reducing SAT formulas using structured bounded variable additio",
   "dependencies": [

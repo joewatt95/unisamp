@@ -102,7 +102,7 @@ index 4d0d0bb..fc4ab93 100755
 +#define BUILD "$(sed '/^COMPILE/!d;s,^COMPILE=,,;s, -I.*,,' makefile)"
  EOF
 diff --git a/makefile.in b/makefile.in
-index 5152cf9..4cbc911 100644
+index f13db42..033e2e9 100644
 --- a/makefile.in
 +++ b/makefile.in
 @@ -1,12 +1,12 @@
@@ -113,11 +113,11 @@ index 5152cf9..4cbc911 100644
 +libcadiback.a: cadiback.o ${CADICAL_INSTALL_DIR}/lib/libcadical.a makefile
  	$(LINK) rcs $@ cadiback.o
 -libcadiback.so: cadiback.o ../cadical/build/libcadical.so makefile
--	$(COMPILE) -shared -o $@ -L../cadical/build/ -lcadical cadiback.o
+-	$(COMPILE) -shared -o $@ cadiback.o -L../cadical/build/ -lcadical
 -cadiback.o: cadiback.cpp config.hpp ../cadical/src/cadical.hpp makefile
 -	$(COMPILE) -c $< -I../cadical/src
 +libcadiback.so: cadiback.o ${CADICAL_INSTALL_DIR}/lib/libcadical.so makefile
-+	$(COMPILE) -shared -o $@ -L${CADICAL_INSTALL_DIR}/lib/ -lcadical cadiback.o
++	$(COMPILE) -shared -o $@ cadiback.o -L${CADICAL_INSTALL_DIR}/lib/ -lcadical
 +cadiback.o: cadiback.cpp config.hpp ${CADICAL_INSTALL_DIR}/include/cadical.hpp makefile
 +	$(COMPILE) -c $< -I${CADICAL_INSTALL_DIR}/include
  config.hpp: generate VERSION makefile
