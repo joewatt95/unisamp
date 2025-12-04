@@ -312,6 +312,8 @@ bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
 
   bool ok = false;
 
+  verb_print(1, "[unig] Number of solutions BSAT found: " << solutions);
+
   if (1 <= solutions && solutions <= hiThresh) {
     const size_t index =
         std::uniform_int_distribution<size_t>(0, hiThresh)(randomEngine);
@@ -384,15 +386,24 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
   // Original pivot from paper
   // thresh_sampler_gen = std::max(200.0, 2 / conf.epsilon);
 
-  verb_print(2, "[unig] threshold_Samplergen: " << thresh_sampler_gen);
+  verb_print(1, "[appmc] Approximate count: " << pow(2, solCount.hashCount) *
+                                                     solCount.cellSolCount);
 
   if (solCount.hashCount == 0 && solCount.cellSolCount == 0) {
     cout << "c o [unig] The input formula is unsatisfiable." << endl;
     exit(-1);
   }
 
-  int m = round(solCount.hashCount + log2(solCount.cellSolCount) -
+  int m = floor(solCount.hashCount + log2(solCount.cellSolCount) -
                 log2(thresh_sampler_gen) + 0.5);
+
+  // cout << "c o hashCount: " << solCount.hashCount << endl;
+
+  // cout << "c o cellSolCount: " << solCount.cellSolCount << endl;
+  // cout << "c o log2(cellSolCount): " << log2(solCount.cellSolCount) << endl;
+
+  // cout << "c o pivot: " << thresh_sampler_gen << endl;
+  // cout << "c o log2(pivot): " << log2(thresh_sampler_gen) << endl;
 
   if (conf.verb > 3) cout << "c o m: " << m << endl;
   if (m > 0)
@@ -594,8 +605,8 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
   verb_print(1, "[unig] Samples requested: " << num_samples_needed);
 
   verb_print(1, "[unig] starting sample generation."
-                    << " loThresh: " << loThresh << ", hiThresh: " << hiThresh
-                    << ", startiter: " << startiter);
+                    << " pivot: " << thresh_sampler_gen
+                    << ", threshold: " << hiThresh << ", m: " << startiter);
 
   uint32_t num_samples = 0;
   if (startiter > 0) {
@@ -680,7 +691,7 @@ void Sampler::reset_working_solver() {
 
   // approxmc sets these options.
   // new_solver->set_up_for_scalmc();
-  // new_solver->set_allow_otf_gauss(); 
+  // new_solver->set_allow_otf_gauss();
 
   // 2. Perform the FAST "simplified" copy.
   // This is fast, but we know it's "dumb" - it's missing
