@@ -67,7 +67,7 @@ std::unique_ptr<CMSat::FieldGen> fg;
 uint32_t verb = 1;
 uint32_t seed;
 double epsilon = 0.3;
-double r_thresh_pivot = 1.6;
+double r_thresh_pivot = 1.5;
 double delta;
 uint32_t verb_banning_cls = 0;
 uint32_t simplify;
@@ -144,7 +144,7 @@ void add_unigen_options() {
          "least 55%% of exact count. "
          "Lower value means more precise.");
   myopt2("-r", "--r-thresh-pivot", r_thresh_pivot, stod,
-         "Controls the ratio between the threshold and pivot. Default of 1.6.");
+         "Controls the ratio between the threshold and pivot. Default of 1.5.");
   myopt2(
       "-d", "--delta", delta, stod,
       "Confidence parameter, i.e. how sure are we of the result? "

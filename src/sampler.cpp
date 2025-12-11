@@ -370,13 +370,8 @@ void Sampler::sample(Config _conf, const ApproxMC::SolCount solCount,
 void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
                              const uint32_t num_samples) {
   conf = _conf;
-
-  load_and_initialize();
-
-  // appmc_solver = appmc->get_solver();
-  // solver = appmc_solver;
-
-  orig_num_vars = appmc_solver->nVars();
+  solver = appmc->get_solver();
+  orig_num_vars = solver->nVars();
   startTime = cpuTimeTotal();
   randomEngine.seed(appmc->get_seed());
 
@@ -799,7 +794,7 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
     // check_and_perform_reset();
 
     // 2. Decide which solver to use for this iteration.
-    solver = is_using_appmc_solver ? appmc_solver : working_solver.get();
+    // solver = is_using_appmc_solver ? appmc_solver : working_solver.get();
 
     // 3. Start the timer.
     // auto start = std::chrono::high_resolution_clock::now();
