@@ -381,8 +381,8 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
   // Original pivot from paper
   // thresh_sampler_gen = std::max(200.0, 2 / conf.epsilon);
 
-  verb_print(1, "[appmc] Approximate count: " << pow(2, solCount.hashCount) *
-                                                     solCount.cellSolCount);
+  verb_print(1, "[appmc] Approximate count: 2^" << solCount.hashCount << " * "
+                                                << solCount.cellSolCount);
 
   if (solCount.hashCount == 0 && solCount.cellSolCount == 0) {
     cout << "c o [unig] The input formula is unsatisfiable." << endl;
