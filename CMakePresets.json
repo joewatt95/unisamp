@@ -15,6 +15,17 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
+    },
+    {
+      "name": "benchmark",
+      "displayName": "Benchmark (Release with Symbols)",
+      "inherits": "base-preset",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -g -march=znver5",
+        "CMAKE_C_FLAGS": "-O3 -DNDEBUG -g -march=znver5",
+        "BUILD_SHARED_LIBS": "OFF"
+      }
     }
   ]
 }
