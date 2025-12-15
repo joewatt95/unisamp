@@ -155,10 +155,10 @@ class Sampler {
   void generate_samples_unisamp(const uint32_t num_samples);
 
   // For dynamic backoff
-  void reset_heuristic_params();
-  void load_and_initialize();
-  void reset_working_solver();
-  void check_and_perform_reset();
+  // void reset_heuristic_params();
+  // void load_and_initialize();
+  // void reset_working_solver();
+  // void check_and_perform_reset();
 
   SolNum bounded_sol_count(uint32_t maxSolutions, const vector<Lit>* assumps,
                            const uint32_t hashCount, uint32_t minSolutions = 1,

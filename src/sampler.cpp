@@ -643,142 +643,129 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
 }
 
 // Helper to reset the heuristics to aggressive state.
-void Sampler::reset_heuristic_params() {
-  baseline_time = std::nullopt;
-  current_window_total_time = 0.0;
-  samples_in_window = 0;
-  current_window_size = WINDOW_MIN;
-  current_slowdown_threshold = THRESHOLD_MIN;
-}
+// void Sampler::reset_heuristic_params() {
+//   baseline_time = std::nullopt;
+//   current_window_total_time = 0.0;
+//   samples_in_window = 0;
+//   current_window_size = WINDOW_MIN;
+//   current_slowdown_threshold = THRESHOLD_MIN;
+// }
 
-void my_copy_solver_to_solver(SATSolver* solver, SATSolver* solver2) {
-  solver2->new_vars(solver->nVars());
-  solver->start_getting_constraints(true);
-  std::vector<Lit> c;
-  bool is_xor;
-  bool rhs;
-  bool ret = true;
-  while (ret) {
-    ret = solver->get_next_constraint(c, is_xor, rhs);
-    if (!ret) break;
-    if (!is_xor) solver2->add_clause(c);
-  }
-  solver->end_getting_constraints();
-}
+// void Sampler::load_and_initialize() {
+//   // ... (all the solver borrowing logic is the same) ...
+//   appmc_solver = appmc->get_solver();
+//   is_using_appmc_solver = true;
 
-void Sampler::load_and_initialize() {
-  // ... (all the solver borrowing logic is the same) ...
-  appmc_solver = appmc->get_solver();
-  is_using_appmc_solver = true;
+//   base_solver = std::make_unique<SATSolver>();
+//   my_copy_solver_to_solver(appmc_solver, base_solver.get());
 
-  base_solver = std::make_unique<SATSolver>();
-  my_copy_solver_to_solver(appmc_solver, base_solver.get());
+//   // --- Initialize Heuristics ---
+//   reset_heuristic_params();
+// }
 
-  // --- Initialize Heuristics ---
-  reset_heuristic_params();
-}
+// void Sampler::reset_working_solver() {
+//   // 1. Create a new, "cold" solver that *we* will own
+//   auto new_solver = std::make_unique<SATSolver>();
 
-void Sampler::reset_working_solver() {
-  // 1. Create a new, "cold" solver that *we* will own
-  auto new_solver = std::make_unique<SATSolver>();
+//   new_solver->set_seed(appmc->get_seed());
 
-  new_solver->set_seed(appmc->get_seed());
+//   // approxmc sets these options.
+//   // new_solver->set_up_for_scalmc();
+//   // new_solver->set_allow_otf_gauss();
 
-  // approxmc sets these options.
-  // new_solver->set_up_for_scalmc();
-  // new_solver->set_allow_otf_gauss();
+//   // 2. Perform the FAST "simplified" copy.
+//   // This is fast, but we know it's "dumb" - it's missing
+//   // the '1 0' clause AND the '1 = TRUE' assignment.
+//   my_copy_solver_to_solver(base_solver.get(), new_solver.get());
 
-  // 2. Perform the FAST "simplified" copy.
-  // This is fast, but we know it's "dumb" - it's missing
-  // the '1 0' clause AND the '1 = TRUE' assignment.
-  my_copy_solver_to_solver(base_solver.get(), new_solver.get());
+//   // 3. --- THE FIX for Unit Propagation ---
+//   // We manually "prime" the new solver with the level-0
+//   // assignments it missed.
+//   // std::vector<CMSat::Lit> units = base_solver->get_zero_assigned_lits();
 
-  // 3. --- THE FIX for Unit Propagation ---
-  // We manually "prime" the new solver with the level-0
-  // assignments it missed.
-  // std::vector<CMSat::Lit> units = base_solver->get_zero_assigned_lits();
+//   // This adds the '[1 = TRUE]' assignment back in.
+//   // for (const CMSat::Lit& lit : units) new_solver->add_clause({lit});
 
-  // This adds the '[1 = TRUE]' assignment back in.
-  // for (const CMSat::Lit& lit : units) new_solver->add_clause({lit});
+//   // 4. Take ownership. The old `working_solver` (if any) is auto-deleted.
+//   working_solver = std::move(new_solver);
 
-  // 4. Take ownership. The old `working_solver` (if any) is auto-deleted.
-  working_solver = std::move(new_solver);
+//   // solver = working_solver.get();
+//   // simplify();
 
-  // solver = working_solver.get();
-  // simplify();
+//   // 5. SWITCH THE FLAG! We are now done with the ApproxMC solver.
+//   is_using_appmc_solver = false;
 
-  // 5. SWITCH THE FLAG! We are now done with the ApproxMC solver.
-  is_using_appmc_solver = false;
+//   // 5. (Good practice) Forget the borrowed pointer so we don't use it by
+//   // mistake. The ApproxMC object is still responsible for deleting it at
+//   // program exit.
+//   appmc_solver = nullptr;
 
-  // 5. (Good practice) Forget the borrowed pointer so we don't use it by
-  // mistake. The ApproxMC object is still responsible for deleting it at
-  // program exit.
-  appmc_solver = nullptr;
+//   // 6. --- Reset Heuristics to Aggressive Default ---
+//   reset_heuristic_params();
+// }
 
-  // 6. --- Reset Heuristics to Aggressive Default ---
-  reset_heuristic_params();
-}
+// void Sampler::check_and_perform_reset() {
+//   // 1. Check if the *current* window is full
+//   if (samples_in_window < current_window_size) return;  // Window not full
+//   yet
 
-void Sampler::check_and_perform_reset() {
-  // 1. Check if the *current* window is full
-  if (samples_in_window < current_window_size) return;  // Window not full yet
+//   // 2. The window is full. Calculate this window's average time.
+//   double recent_avg = current_window_total_time / samples_in_window;
 
-  // 2. The window is full. Calculate this window's average time.
-  double recent_avg = current_window_total_time / samples_in_window;
+//   // 3. Reset the counters for the *next* window
+//   current_window_total_time = 0.0;
+//   samples_in_window = 0;
 
-  // 3. Reset the counters for the *next* window
-  current_window_total_time = 0.0;
-  samples_in_window = 0;
+//   // 4. Set the baseline on the very first run.
+//   if (!baseline_time.has_value()) {
+//     baseline_time.emplace(recent_avg);
+//     return;  // Don't check on the first run, just set the baseline
+//   }
 
-  // 4. Set the baseline on the very first run.
-  if (!baseline_time.has_value()) {
-    baseline_time.emplace(recent_avg);
-    return;  // Don't check on the first run, just set the baseline
-  }
+//   const double current_fail_threshold =
+//       baseline_time.value() * current_slowdown_threshold;
 
-  const double current_fail_threshold =
-      baseline_time.value() * current_slowdown_threshold;
+//   // --- The Hybrid Check ---
+//   if (recent_avg <= current_fail_threshold) {
+//     // --- PASSED: Reward the solver ---
 
-  // --- The Hybrid Check ---
-  if (recent_avg <= current_fail_threshold) {
-    // --- PASSED: Reward the solver ---
+//     int new_window_size =
+//         static_cast<int>(current_window_size * WINDOW_GROW_FACTOR);
+//     current_window_size = std::clamp(new_window_size, WINDOW_MIN,
+//     WINDOW_MAX);
 
-    int new_window_size =
-        static_cast<int>(current_window_size * WINDOW_GROW_FACTOR);
-    current_window_size = std::clamp(new_window_size, WINDOW_MIN, WINDOW_MAX);
+//     double new_threshold = current_slowdown_threshold + THRESHOLD_RELAX_STEP;
+//     current_slowdown_threshold =
+//         std::clamp(new_threshold, THRESHOLD_MIN, THRESHOLD_MAX);
+//   } else {
+//     // --- FAILED: We are too slow ---
 
-    double new_threshold = current_slowdown_threshold + THRESHOLD_RELAX_STEP;
-    current_slowdown_threshold =
-        std::clamp(new_threshold, THRESHOLD_MIN, THRESHOLD_MAX);
-  } else {
-    // --- FAILED: We are too slow ---
-
-    // Is this solver still in the "Nursery"?
-    // We define "Nursery" as any solver that hasn't been "promoted" at least
-    // once.
-    const bool is_in_nursery = (current_window_size <= WINDOW_MIN);
-    if (is_in_nursery)
-      // "Nursery" failure = Hard Reset
-      // This solver failed its very first test.
-      // It's a "simple formula" case. It gets NO leniency.
-      reset_working_solver();
-    else {
-      // "Trusted" failure = Check Minor/Major failure
-      // // This solver was *proven* (it passed at least one check).
-      // NOW we grant it the "Minor vs. Major failure" logic.
-      const double catastrophe_limit =
-          current_fail_threshold * CATASTROPHE_FACTOR;
-      if (recent_avg < catastrophe_limit) {
-        // "MINOR" FAILURE (Soft Reset)
-        int new_window_size = static_cast<int>(current_window_size / 2.0);
-        current_window_size =
-            std::clamp(new_window_size, WINDOW_MIN, WINDOW_MAX);
-      } else
-        // "MAJOR" FAILURE (Hard Reset)
-        reset_working_solver();
-    }
-  }
-}
+//     // Is this solver still in the "Nursery"?
+//     // We define "Nursery" as any solver that hasn't been "promoted" at least
+//     // once.
+//     const bool is_in_nursery = (current_window_size <= WINDOW_MIN);
+//     if (is_in_nursery)
+//       // "Nursery" failure = Hard Reset
+//       // This solver failed its very first test.
+//       // It's a "simple formula" case. It gets NO leniency.
+//       reset_working_solver();
+//     else {
+//       // "Trusted" failure = Check Minor/Major failure
+//       // // This solver was *proven* (it passed at least one check).
+//       // NOW we grant it the "Minor vs. Major failure" logic.
+//       const double catastrophe_limit =
+//           current_fail_threshold * CATASTROPHE_FACTOR;
+//       if (recent_avg < catastrophe_limit) {
+//         // "MINOR" FAILURE (Soft Reset)
+//         int new_window_size = static_cast<int>(current_window_size / 2.0);
+//         current_window_size =
+//             std::clamp(new_window_size, WINDOW_MIN, WINDOW_MAX);
+//       } else
+//         // "MAJOR" FAILURE (Hard Reset)
+//         reset_working_solver();
+//     }
+//   }
+// }
 
 uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
   SparseData sparse_data(-1);
