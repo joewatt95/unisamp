@@ -20,7 +20,7 @@
     },
     {
       "name": "approxmc",
-      "version>=": "4.2.0-27740ac"
+      "version>=": "4.2.0-6213fb2"
     },
     {
       "name": "arjun",
@@ -28,7 +28,7 @@
     },
     {
       "name": "cryptominisat",
-      "version>=": "5.13.0-34ec41b"
+      "version>=": "5.13.0-4c377ec"
     },
     {
       "name": "sbva",

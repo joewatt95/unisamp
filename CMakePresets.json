@@ -2,16 +2,16 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "base-preset",
+      "name": "base",
       "displayName": "Base Preset",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build",
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
     },
     {
-      "name": "RelWithDebInfo",
+      "name": "release-debug",
       "displayName": "Release build with debug info",
-      "inherits": "base-preset",
+      "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
@@ -19,7 +19,7 @@
     {
       "name": "benchmark",
       "displayName": "Benchmark (Release with Symbols)",
-      "inherits": "base-preset",
+      "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_CXX_FLAGS": "-O3 -DNDEBUG -g -march=znver5",

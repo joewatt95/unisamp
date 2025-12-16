@@ -1,6 +1,6 @@
 {
   "name": "approxmc",
-  "version-string": "4.2.0-dd3a4be",
+  "version-string": "4.2.0-6213fb2",
   "homepage": "https://github.com/meelgroup/approxmc",
   "description": "Approximate Model Counter",
   "dependencies": [
@@ -22,11 +22,11 @@
     },
     {
       "name": "arjun",
-      "version>=": "2.6.1-d5fff41"
+      "version>=": "2.6.1-2334ce5"
     },
     {
       "name": "cryptominisat",
-      "version>=": "5.13.0-34ec41b"
+      "version>=": "5.13.0-4c377ec"
     },
     {
       "name": "sbva",
