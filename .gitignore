@@ -1,4 +1,5 @@
 build/
+**plots/
 .kdev4/
 scalmc.kdev4
 .cache/
