@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-plot_results.py
+plot_results.py (Unified: Time + Samples)
 
 Features:
-- **CDF Plot**: Replaces Cactus. Shows "Solved Instances (Y)" vs "CPU Time (X)".
-- **Detailed Stats**: Computes PAR-2, Success Counts, and classifies Timeouts.
-- **CPU Time Focus**: Uses scientific CPU time for all metrics.
+- **Time Analysis**: PAR-2 scores, Time CDF, Time Box Plots.
+- **Sample Analysis**: Solution Count Scatter (with Time coloring), Throughput Curves.
+- **Unified**: Generates all plots in one run.
+
+python results_new.csv --baseline results_old.csv -o out
 """
 
 import argparse
@@ -24,10 +26,15 @@ OUTPUT_FORMAT = "svg"
 
 def load_and_unify_data(main_csv, param_col, baseline_csv=None):
     df_main = pd.read_csv(main_csv)
- 
-    # Labeling
-    if param_col in df_main.columns:
-        df_main['Solver_Version'] = f"{param_col}=" + df_main[param_col].astype(str)
+    
+    # 1. Standardize 'Solver_Version' Label
+    if param_col and param_col in df_main.columns:
+        df_main['Solver_Version'] = df_main[param_col].apply(lambda x: f"{param_col}={x}")
+    elif {'r', 'e', 'samples'}.intersection(df_main.columns):
+        cols = [c for c in ['r', 'e', 'samples'] if c in df_main.columns]
+        df_main['Solver_Version'] = df_main[cols].apply(
+            lambda x: "_".join(f"{k}={v}" for k, v in x.items()), axis=1
+        )
     else:
         df_main['Solver_Version'] = "New_Version"
 
@@ -38,34 +45,23 @@ def load_and_unify_data(main_csv, param_col, baseline_csv=None):
     else:
         df_final = df_main
 
-    # --- TIME METRIC SELECTION ---
-    # Prefer CPU_Time if available (new script), fallback to Wall_Time (old script legacy)
+    # 2. Setup Time Metric (CPU Priority)
     if 'CPU_Time' in df_final.columns:
         time_metric = 'CPU_Time'
     elif 'Wall_Time' in df_final.columns:
-        print("Warning: 'CPU_Time' not found. Using 'Wall_Time'. (Did you re-run collate?)")
         time_metric = 'Wall_Time'
     else:
-        raise ValueError("No time column found in CSV")
+        time_metric = 'Real_Time'
 
-    # Clean numeric
+    # Clean numeric time
     df_final[time_metric] = pd.to_numeric(df_final[time_metric], errors='coerce')
-    
-    # Solved Logic
-    # Old Logic (Too Strict):
-    # df_final['Solved'] = df_final['Outcome'].str.contains('Success', ...
 
-    # New Logic (CPU Focused):
-    # Considers it solved if it says "Success" OR "Finished" (the Zombie case)
-    def is_cpu_success(outcome):
-        s = str(outcome).lower()
-        # "Success" = clean exit
-        # "Finished" = logic done, but maybe I/O timeout (Zombie)
-        return "success" in s or "finished" in s
+    # 3. Solved Status Logic
+    df_final['Solved'] = df_final['Outcome'].astype(str).apply(
+        lambda x: "success" in x.lower() or "unsat" in x.lower()
+    )
 
-    df_final['Solved'] = df_final['Outcome'].apply(is_cpu_success)
-    
-    # PAR-2 & Capped Time Logic
+    # 4. PAR-2 Calculation
     df_final['Time_PAR2'] = df_final[time_metric]
     df_final.loc[~df_final['Solved'], 'Time_PAR2'] = TIMEOUT * PAR_PENALTY
     
@@ -73,56 +69,55 @@ def load_and_unify_data(main_csv, param_col, baseline_csv=None):
     df_final.loc[~df_final['Solved'], 'Time_Capped'] = TIMEOUT
     df_final.loc[df_final['Time_Capped'] > TIMEOUT, 'Time_Capped'] = TIMEOUT
 
+    # 5. Parse Solution Counts (For Partial Progress Plots)
+    # Check multiple potential column names
+    sol_col = None
+    for c in ['Solutions_Found', 'found', 'samples']:
+        if c in df_final.columns:
+            sol_col = c
+            break
+            
+    if sol_col:
+        df_final['Samples_Found'] = pd.to_numeric(df_final[sol_col], errors='coerce').fillna(0).astype(int)
+    else:
+        df_final['Samples_Found'] = 0
+
     return df_final
 
 def print_detailed_stats(df):
     print("\n" + "="*80)
-    print(f"{'VERSION':<20} | {'PAR-2':<8} | {'SOLVED':<8} | {'TIMEOUTS (Breakdown)':<30}")
+    print(f"{'VERSION':<30} | {'PAR-2':<8} | {'SOLVED':<8} | {'AVG SAMPLES'}")
     print("="*80)
 
     for version, group in df.groupby('Solver_Version'):
         total = len(group)
         solved = group['Solved'].sum()
         par2 = group['Time_PAR2'].mean()
+        avg_samples = group['Samples_Found'].mean()
         
         # Breakdown Failures
         timeouts = group[group['Outcome'].str.contains('Timeout', na=False)]
         t_total = len(timeouts)
         
-        # Try to classify timeouts if phase info exists "Timeout (Sampling)"
-        # You might need to adjust string matching based on exact Outcome format
-        t_samp = timeouts['Outcome'].str.contains('Sampling').sum()
-        t_appmc = timeouts['Outcome'].str.contains('ApproxMC').sum()
-        t_plain = t_total - t_samp - t_appmc
-        
-        # Format breakdown string
-        breakdown = f"Tot:{t_total} (S:{t_samp}, A:{t_appmc}, ?: {t_plain})"
-        
-        print(f"{version:<20} | {par2:<8.1f} | {solved}/{total} | {breakdown}")
+        print(f"{version:<30} | {par2:<8.1f} | {solved}/{total} | {avg_samples:.1f}")
     print("="*80 + "\n")
 
-def plot_cdf(df, output_dir):
-    """
-    Plots CDF-style: X-Axis = Time, Y-Axis = Count of Solved Instances.
-    This replaces the inverted Cactus plot.
-    """
+# ================= PLOTTING FUNCTIONS =================
+
+def plot_cdf_time(df, output_dir):
+    """ Standard Time-based CDF """
     plt.figure(figsize=(10, 7))
     versions = sorted(df['Solver_Version'].unique())
     palette = sns.color_palette("tab10", n_colors=len(versions))
 
     for i, version in enumerate(versions):
         group = df[df['Solver_Version'] == version]
-        
-        # Get solved times and SORT them
         solved_times = sorted(group[group['Solved']]['Time_Capped'].tolist())
         
         if not solved_times: continue
 
-        # X = Times
-        # Y = Cumulative Count (1 to N)
         y_axis = range(1, len(solved_times) + 1)
         
-        # Line Style
         if version == BASELINE_NAME:
             plt.plot(solved_times, y_axis, color='black', linewidth=2.5, 
                      linestyle='--', label=version, zorder=10)
@@ -132,63 +127,22 @@ def plot_cdf(df, output_dir):
 
     plt.xscale('log')
     plt.xlabel("CPU Time (s) [Log Scale]", fontsize=12)
-    plt.ylabel("Number of Solved Instances (Cumulative)", fontsize=12)
+    plt.ylabel("Solved Instances (Cumulative)", fontsize=12)
     plt.title("Solved Instances over Time (CDF)", fontsize=14)
     plt.grid(True, which="both", alpha=0.2)
     plt.legend(loc="lower right")
     plt.tight_layout()
-    plt.savefig(output_dir / f"cdf_comparison.{OUTPUT_FORMAT}", format=OUTPUT_FORMAT)
-    print(f"Generated cdf_comparison.{OUTPUT_FORMAT}")
+    plt.savefig(output_dir / f"cdf_time.{OUTPUT_FORMAT}")
+    print(f"Generated cdf_time.{OUTPUT_FORMAT}")
 
-def plot_box_distributions(df, output_dir):
+def plot_scatter_samples(df, output_dir):
     """
-    Box Plot: Shows runtime distribution for SOLVED instances only.
-    - Hides outliers (showfliers=False) to prevent black bars of dots.
-    - Uses Log Scale.
+    Scatter: Baseline Samples vs Best New Samples.
+    COLOR: Encodes Time Speedup.
     """
-    # 1. Filter: Only plot successfully solved instances
-    solved_df = df[df['Solved']].copy()
-    
-    if solved_df.empty:
-        print("Warning: No solved instances to plot boxes for.")
-        return
+    if BASELINE_NAME not in df['Solver_Version'].values: return
 
-    plt.figure(figsize=(12, 6))
-    
-    # 2. Ordering: Put Baseline last for easy comparison
-    versions = sorted(solved_df['Solver_Version'].unique())
-    if BASELINE_NAME in versions:
-        versions.remove(BASELINE_NAME)
-        versions.append(BASELINE_NAME)
-    
-    # 3. Plot
-    # showfliers=False is CRITICAL for cleaning up 1900+ benchmark plots
-    sns.boxplot(data=solved_df, x='Solver_Version', y='Time_Capped', 
-                order=versions, palette="viridis", showfliers=False, linewidth=1)
-    
-    plt.yscale('log')
-    plt.xticks(rotation=45, ha='right')
-    plt.xlabel("Solver Version", fontsize=12)
-    plt.ylabel("CPU Time (s) [Log Scale]", fontsize=12)
-    plt.title("Runtime Distribution (Median & Variance)", fontsize=14)
-    plt.grid(True, axis='y', alpha=0.3, which='major')
-    plt.tight_layout()
-    
-    out_file = output_dir / f"runtime_distributions.{OUTPUT_FORMAT}"
-    plt.savefig(out_file, format=OUTPUT_FORMAT)
-    print(f"Generated {out_file}")
-
-def plot_scatter_best_vs_baseline(df, output_dir):
-    """
-    Scatter Plot: Compares Baseline vs. The Best New Configuration.
-    - Points below diagonal = New Version is Faster.
-    - Vertical Wall on right = Timeouts Rescued by New Version.
-    """
-    # 1. Sanity Check: Do we have a baseline?
-    if BASELINE_NAME not in df['Solver_Version'].values:
-        return
-
-    # 2. Identify the "Best" New Version (Lowest PAR-2 Score)
+    # Identify Best New Version (Lowest PAR-2)
     ranking = df.groupby('Solver_Version')['Time_PAR2'].mean().sort_values()
     best_new = None
     for version in ranking.index:
@@ -196,48 +150,84 @@ def plot_scatter_best_vs_baseline(df, output_dir):
             best_new = version
             break
             
-    if not best_new:
-        print("No new versions found to compare against baseline.")
-        return
+    if not best_new: return
         
-    print(f"Scatter Plot: Comparing '{BASELINE_NAME}' vs Best New '{best_new}'")
+    print(f"Sample Scatter: Comparing '{BASELINE_NAME}' vs '{best_new}'")
 
-    # 3. Pivot Data for Head-to-Head
-    # Rows=File, Cols=Version, Values=Time_Capped
-    pivot = df.pivot(index='Input_File', columns='Solver_Version', values='Time_Capped')
-    data = pivot[[BASELINE_NAME, best_new]].dropna()
+    # Pivot Data
+    # We need both Samples and Time for coloring
+    pivot_samp = df.pivot(index='Input_File', columns='Solver_Version', values='Samples_Found')
+    pivot_time = df.pivot(index='Input_File', columns='Solver_Version', values='Time_Capped')
+    
+    data_samp = pivot_samp[[BASELINE_NAME, best_new]].dropna()
+    data_time = pivot_time[[BASELINE_NAME, best_new]].dropna()
+    
+    # Calculate Speedup for Coloring (Base Time / New Time)
+    # > 1 means New is Faster (Green), < 1 means Slower (Red)
+    # We use Log scale for color map
+    speedup = data_time[BASELINE_NAME] / data_time[best_new]
 
-    plt.figure(figsize=(7, 7))
+    plt.figure(figsize=(8, 7))
     
-    # 4. Plot
-    # s=15 (small dots), alpha=0.4 (transparency) helps see density
-    plt.scatter(data[BASELINE_NAME], data[best_new], 
-                alpha=0.4, edgecolors='none', s=15, c='#1f77b4')
+    # Jitter to show density at (0,0) and (100,100)
+    jitter_x = data_samp[BASELINE_NAME] + (np.random.rand(len(data_samp)) - 0.5) * 2
+    jitter_y = data_samp[best_new] + (np.random.rand(len(data_samp)) - 0.5) * 2
+
+    sc = plt.scatter(jitter_x, jitter_y, c=np.log10(speedup), cmap='RdYlGn', 
+                     vmin=-1, vmax=1, alpha=0.7, s=20, edgecolors='grey', linewidth=0.3)
+
+    # Diagonal
+    max_val = max(data_samp.max().max(), 100)
+    plt.plot([0, max_val], [0, max_val], 'k--', linewidth=1, label="Equal Samples")
+
+    cbar = plt.colorbar(sc)
+    cbar.set_label("Speedup (Log Scale)\nGreen=New Faster, Red=New Slower", rotation=270, labelpad=20)
+
+    plt.xlabel(f"Samples Found: {BASELINE_NAME}", fontsize=11)
+    plt.ylabel(f"Samples Found: {best_new}", fontsize=11)
+    plt.title(f"Head-to-Head: Samples Found\n(Color indicates Timing Speedup)", fontsize=13)
     
-    # Diagonal "Tie" Line
-    # Plot from min time (e.g. 0.01s) to max time (TIMEOUT)
-    limit_min = min(data.min().min(), 0.1)
-    limit_max = TIMEOUT
-    plt.plot([limit_min, limit_max], [limit_min, limit_max], 'r--', linewidth=1.5, label="Equal Performance")
-    
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel(f"CPU Time: {BASELINE_NAME} (s)", fontsize=11)
-    plt.ylabel(f"CPU Time: {best_new} (s)", fontsize=11)
-    plt.title(f"Head-to-Head: Baseline vs {best_new}", fontsize=13)
-    
-    # Force axes to be square so the diagonal is actually 45 degrees
     plt.axis('square')
-    plt.xlim([limit_min, limit_max * 1.1])
-    plt.ylim([limit_min, limit_max * 1.1])
-    
-    plt.legend()
-    plt.grid(True, which="major", alpha=0.3)
+    plt.xlim(-5, max_val + 5)
+    plt.ylim(-5, max_val + 5)
+    plt.grid(True, linestyle=':', alpha=0.5)
     plt.tight_layout()
     
-    out_file = output_dir / f"scatter_best_vs_baseline.{OUTPUT_FORMAT}"
-    plt.savefig(out_file, format=OUTPUT_FORMAT)
-    print(f"Generated {out_file}")
+    plt.savefig(output_dir / f"scatter_samples_colored.{OUTPUT_FORMAT}")
+    print(f"Generated scatter_samples_colored.{OUTPUT_FORMAT}")
+
+def plot_throughput_curve(df, output_dir):
+    """
+    Plots 'Sorted Sample Yield'.
+    X-axis: Top N Benchmarks
+    Y-axis: Samples Found (Sorted Descending)
+    Shows which solver maintains high sample yield on more instances.
+    """
+    plt.figure(figsize=(10, 7))
+    versions = sorted(df['Solver_Version'].unique())
+    palette = sns.color_palette("tab10", n_colors=len(versions))
+
+    for i, version in enumerate(versions):
+        group = df[df['Solver_Version'] == version]
+        # Sort samples descending (Yield Curve)
+        yields = sorted(group['Samples_Found'].tolist(), reverse=True)
+        
+        x_axis = range(1, len(yields) + 1)
+        
+        if version == BASELINE_NAME:
+            plt.plot(x_axis, yields, color='black', linewidth=2.5, 
+                     linestyle='--', label=version)
+        else:
+            plt.plot(x_axis, yields, color=palette[i], linewidth=2, alpha=0.8, label=version)
+
+    plt.xlabel("Number of Benchmarks (Sorted by Yield)", fontsize=12)
+    plt.ylabel("Samples Found", fontsize=12)
+    plt.title("Sample Yield Profile (Throughput)", fontsize=14)
+    plt.grid(True, which="both", alpha=0.2)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_dir / f"throughput_curve.{OUTPUT_FORMAT}")
+    print(f"Generated throughput_curve.{OUTPUT_FORMAT}")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -251,11 +241,13 @@ def main():
     df = load_and_unify_data(args.main_csv, args.param, args.baseline)
 
     print_detailed_stats(df)
-    plot_cdf(df, args.output_dir)
-    plot_scatter_best_vs_baseline(df, args.output_dir)
-    plot_box_distributions(df, args.output_dir)
-
-    # You can keep plot_scatter / plot_box here if desired
+    
+    # 1. Standard Time Plots
+    plot_cdf_time(df, args.output_dir)
+    
+    # 2. New Partial Progress Plots
+    plot_scatter_samples(df, args.output_dir)
+    plot_throughput_curve(df, args.output_dir)
 
 if __name__ == "__main__":
     main()
