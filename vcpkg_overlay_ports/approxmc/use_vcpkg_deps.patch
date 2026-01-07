@@ -1,25 +1,562 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d6b22a4..140859a 100644
+index ba60bc5..608c9c3 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -398,6 +398,7 @@ message(STATUS "CryptoMiniSat5 include dirs: ${CRYPTOMINISAT5_INCLUDE_DIRS}")
- find_package(arjun CONFIG REQUIRED)
+@@ -452,6 +452,7 @@ find_package(arjun CONFIG REQUIRED)
+ message(STATUS "Found Arjun")
  message(STATUS "Arjun dynamic lib : ${ARJUN_LIBRARIES}")
  message(STATUS "Arjun include dirs: ${ARJUN_INCLUDE_DIRS}")
 +find_package(Eigen3 CONFIG REQUIRED)
  find_package(sbva CONFIG REQUIRED)
  
  # -----------------------------------------------------------------------------
+diff --git a/run.sh b/run.sh
+index c8a1c2b..f785986 100755
+--- a/run.sh
++++ b/run.sh
+@@ -10,7 +10,7 @@ CNF=$1
+ ./cert_tools/gen_rand 8//10 2//10 $CNF rand
+ 
+ # Call approxmc and generate certificate
+-./cert_tools/approxmc --arjun 0 --randbits rand --cert cert $CNF
++./cert_tools/approxmc --randbits rand --cert cert $CNF
+ 
+ # Run the certificate checker
+ ./cert_tools/certcheck_cnf_xor 8//10 2//10 $CNF rand cert check_unsat_cms.sh
+diff --git a/src/approxmc.cpp b/src/approxmc.cpp
+index 1b2a677..7a55350 100644
+--- a/src/approxmc.cpp
++++ b/src/approxmc.cpp
+@@ -31,6 +31,8 @@
+ #include "appmc_constants.h"
+ #include "config.h"
+ #include <iostream>
++#include <memory>
++#include "GitSHA1.h"
+ 
+ using std::cout;
+ using std::endl;
+@@ -45,30 +47,29 @@ using namespace AppMCInt;
+ 
+ namespace ApproxMC {
+     struct AppMCPrivateData {
+-        AppMCPrivateData(): counter(conf) {}
++        AppMCPrivateData(const std::unique_ptr<CMSat::FieldGen>& fg):
++            conf(fg),
++            counter(conf, fg) {}
+         Config conf;
+         Counter counter;
++        bool sampl_vars_declared = false;
+     };
+ }
+ 
+ using namespace ApproxMC;
+ 
+-DLL_PUBLIC AppMC::AppMC()
++DLL_PUBLIC AppMC::AppMC(const std::unique_ptr<CMSat::FieldGen>& _fg)
+ {
+-    data = new AppMCPrivateData;
+-    data->counter.solver = new SATSolver();
++    data = std::make_unique<AppMCPrivateData>(_fg);
++    data->counter.solver = std::make_unique<SATSolver>();
+     data->counter.solver->set_up_for_scalmc();
+     data->counter.solver->set_allow_otf_gauss();
+ }
+ 
+-DLL_PUBLIC AppMC::~AppMC()
+-{
+-    delete data->counter.solver;
+-    delete data;
+-}
++DLL_PUBLIC AppMC::~AppMC() = default;
+ 
+ // Helper function, used only in this unit
+-void setup_sampling_vars(AppMCPrivateData* data)
++void setup_sampling_vars(unique_ptr<AppMCPrivateData>& data)
+ {
+     if (data->conf.sampl_vars.empty()) {
+         if (data->conf.verb) {
+@@ -99,9 +100,9 @@ void setup_sampling_vars(AppMCPrivateData* data)
+     data->counter.solver->set_sampl_vars(data->conf.sampl_vars);
+ }
+ 
+-DLL_PUBLIC string AppMC::get_version_info()
++DLL_PUBLIC string AppMC::get_version_sha1()
+ {
+-    return data->counter.get_version_info();
++    return AppMCInt::get_version_sha1();
+ }
+ 
+ DLL_PUBLIC void AppMC::set_up_log(string log_file_name)
+@@ -220,7 +221,7 @@ DLL_PUBLIC bool AppMC::get_reuse_models()
+ 
+ DLL_PUBLIC bool AppMC::find_one_solution()
+ {
+-    return data->counter.find_one_solution(data->conf);
++    return data->counter.find_one_solution();
+ }
+ 
+ DLL_PUBLIC ApproxMC::SolCount AppMC::count()
+@@ -298,7 +299,7 @@ DLL_PUBLIC bool AppMC::add_xor_clause(const vector<uint32_t>& vars, bool rhs)
+ 
+ DLL_PUBLIC CMSat::SATSolver* AppMC::get_solver()
+ {
+-    return data->counter.solver;
++    return data->counter.solver.get();
+ }
+ 
+ DLL_PUBLIC const std::vector<uint32_t>& AppMC::get_sampling_set() const
+@@ -325,13 +326,13 @@ DLL_PUBLIC bool AppMC::get_sampl_vars_set() const {
+     return data->conf.sampl_vars_set;
+ }
+ 
+- DLL_PUBLIC void AppMC::set_multiplier_weight(const mpz_class& weight) {
+-     data->conf.multiplier_weight = weight;
+- }
++DLL_PUBLIC void AppMC::set_multiplier_weight(const std::unique_ptr<CMSat::Field>& weight) {
++    data->conf.multiplier_weight = weight->dup();
++}
+ 
+- DLL_PUBLIC const mpz_class& AppMC::get_multiplier_weight() const {
+-     return data->conf.multiplier_weight;
+- }
++DLL_PUBLIC const std::unique_ptr<CMSat::Field>& AppMC::get_multiplier_weight() const {
++    return data->conf.multiplier_weight;
++}
+ 
+ DLL_PUBLIC void AppMC::set_weighted(const bool weighted) {
+     if (weighted) {
+@@ -340,7 +341,10 @@ DLL_PUBLIC void AppMC::set_weighted(const bool weighted) {
+     }
+ }
+ 
+-DLL_PUBLIC void AppMC::set_lit_weight(const Lit&, const double) {
++DLL_PUBLIC void AppMC::set_projected(const bool) {
++}
++
++DLL_PUBLIC void AppMC::set_lit_weight(const Lit&, const std::unique_ptr<Field>&) {
+     cout << "ERROR: Weighted ApproxMC is not supported" << endl;
+     exit(-1);
+ }
+diff --git a/src/approxmc.h b/src/approxmc.h
+index 2c97d7c..466875c 100644
+--- a/src/approxmc.h
++++ b/src/approxmc.h
+@@ -33,11 +33,7 @@
+ #include <cstdint>
+ #include <string>
+ #include <vector>
+-#ifdef CMS_LOCAL_BUILD
+-#include "cryptominisat.h"
+-#else
+ #include <cryptominisat5/cryptominisat.h>
+-#endif
+ namespace ApproxMC {
+ 
+ #ifdef _WIN32
+@@ -65,7 +61,7 @@ class AppMC
+ #endif
+ {
+ public:
+-    AppMC();
++    AppMC(const std::unique_ptr<CMSat::FieldGen>& _fg);
+     ~AppMC();
+     ApproxMC::SolCount count();
+     bool find_one_solution();
+@@ -74,11 +70,13 @@ public:
+     void set_sampl_vars(const std::vector<uint32_t>& vars);
+     void set_opt_sampl_vars(const std::vector<uint32_t>& vars);
+     bool get_sampl_vars_set() const;
++    bool get_opt_sampl_vars_set() const { return false; }
+     const std::vector<uint32_t>& get_sampl_vars() const;
+-    void set_multiplier_weight(const mpz_class& weight);
+-    const mpz_class& get_multiplier_weight() const;
++    void set_multiplier_weight(const std::unique_ptr<CMSat::Field>& weight);
++    const std::unique_ptr<CMSat::Field>& get_multiplier_weight() const;
+     void set_weighted(const bool weighted);
+-    void set_lit_weight(const CMSat::Lit& lit, const double weight);
++    void set_projected(const bool projected);
++    void set_lit_weight(const CMSat::Lit& lit, const std::unique_ptr<CMSat::Field>& weight);
+ 
+     // Adding constraints
+     void new_var();
+@@ -90,7 +88,7 @@ public:
+     bool add_xor_clause(const std::vector<uint32_t>& vars, bool rhs);
+ 
+     // Information about approxmc
+-    std::string get_version_info();
++    static std::string get_version_sha1();
+     void print_stats(const double start_time);
+ 
+     //Main options
+@@ -129,7 +127,7 @@ private:
+     ////////////////////////////
+     // Do not bother with this, it's private
+     ////////////////////////////
+-    AppMCPrivateData* data;
++    std::unique_ptr<AppMCPrivateData> data;
+ };
+ 
+ }
+diff --git a/src/config.h b/src/config.h
+index 72e9777..dd341c7 100644
+--- a/src/config.h
++++ b/src/config.h
+@@ -28,14 +28,18 @@
+ 
+ #pragma once
+ 
++#include <memory>
+ #include <vector>
+ #include <cstdint>
+ #include <string>
+ #include <gmpxx.h>
++#include <cryptominisat5/solvertypesmini.h>
+ 
+ namespace AppMCInt {
+ 
+-struct Config {
++class Config {
++  public:
++    Config(const std::unique_ptr<CMSat::FieldGen>& _fg) : multiplier_weight(_fg->one()) {}
+     uint32_t start_iter = 0;
+     double epsilon = 0.80; //Tolerance.  CAV-2020 paper default
+     double delta = 0.2;    //Confidence. CAV-2020 paper default
+@@ -56,7 +60,8 @@ struct Config {
+ 
+     std::vector<uint32_t> sampl_vars;
+     bool sampl_vars_set = false;
+-    mpz_class multiplier_weight = 1;
++    std::unique_ptr<CMSat::Field> multiplier_weight = nullptr;
++    // mpz_class multiplier_weight = 1;
+ };
+ 
+ }
+diff --git a/src/counter.cpp b/src/counter.cpp
+index 2d4e013..b9fd622 100644
+--- a/src/counter.cpp
++++ b/src/counter.cpp
+@@ -406,12 +406,12 @@ void Counter::set_up_probs_threshold_measurements(
+     }
+ }
+ 
+-bool Counter::find_one_solution(Config _conf)
++bool Counter::find_one_solution()
+ {
+     auto ret = solver->solve();
+ 
+     // certification
+-    conf = _conf;
++    // conf = _conf;
+     orig_num_vars = solver->nVars();
+     open_certfile();
+     certfile << '0' << endl;
+@@ -800,7 +800,7 @@ string scalmc_version_info()
+ string Counter::get_version_info() const
+ {
+     string ret = ::scalmc_version_info();
+-    ret += solver->get_text_version_info();
++    ret += solver->get_version_sha1();
+ 
+     return ret;
+ }
+diff --git a/src/counter.h b/src/counter.h
+index 936429c..eef6910 100644
+--- a/src/counter.h
++++ b/src/counter.h
+@@ -29,6 +29,7 @@
+ 
+ #include "config.h"
+ #include <fstream>
++#include <memory>
+ #include <random>
+ #include <map>
+ #include <utility>
+@@ -42,6 +43,7 @@ using std::vector;
+ using std::map;
+ using std::pair;
+ using namespace CMSat;
++using std::unique_ptr;
+ 
+ namespace AppMCInt {
+ 
+@@ -94,15 +96,15 @@ struct SparseData {
+ 
+ class Counter {
+ public:
+-    Counter(Config& _conf) : conf(_conf) {}
++    Counter(Config& _conf, const unique_ptr<FieldGen>& _fg) : fg(_fg->dup()), conf(_conf) {}
+     ApproxMC::SolCount solve();
+     string gen_rnd_bits(const uint32_t size,
+                         const uint32_t numhashes, SparseData& sparse_data);
+     string binary(const uint32_t x, const uint32_t length);
+-    bool find_one_solution(Config _conf);
++    bool find_one_solution();
+     bool gen_rhs();
+     uint32_t threshold_appmcgen;
+-    SATSolver* solver = nullptr;
++    unique_ptr<SATSolver> solver = nullptr;
+     string get_version_info() const;
+     ApproxMC::SolCount calc_est_count();
+     const Constants constants;
+@@ -111,6 +113,7 @@ public:
+     bool solver_add_xor_clause(const vector<Lit>& lits, const bool rhs);
+ 
+ private:
++    unique_ptr<FieldGen> fg;
+     Config& conf;
+     ApproxMC::SolCount count();
+     void add_appmc_options();
 diff --git a/src/main.cpp b/src/main.cpp
-index a5b8e5f..bff9d26 100644
+index bb8bb6a..4f1b57d 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
-@@ -43,7 +43,7 @@
- #include <cryptominisat5/dimacsparser.h>
- #include <cryptominisat5/streambuffer.h>
- #include <arjun/arjun.h>
--#include "src/argparse.hpp"
-+#include <argparse/argparse.hpp>
+@@ -51,7 +51,6 @@ using std::set;
+ using std::string;
+ using std::vector;
+ ApproxMC::AppMC* appmc = nullptr;
+-ArjunNS::Arjun* arjun = nullptr;
+ argparse::ArgumentParser program = argparse::ArgumentParser("approxmc");
  
- using namespace CMSat;
- using std::cout;
+ uint32_t verb = 1;
+@@ -69,18 +68,19 @@ uint32_t reuse_models = 1;
+ uint32_t force_sol_extension = 0;
+ uint32_t sparse = 0;
+ int dump_intermediary_cnf = 0;
++std::unique_ptr<CMSat::FieldGen> fg;
+ 
+ //Arjun
+-int ignore_sampl_set = 0;
+-int do_arjun = 1;
+-int debug_arjun = 0;
++// int ignore_sampl_set = 0;
++// int do_arjun = 0;
++// int debug_arjun = 0;
+ int debug = 0;
+-int with_e = 1;
+-int e_iter_1 = 2;
+-int e_iter_2 = 0;
+-int e_vivif = 1;
+-int e_sparsify = 0;
+-int e_get_reds = 0;
++// int with_e = 1;
++// int e_iter_1 = 2;
++// int e_iter_2 = 0;
++// int e_vivif = 1;
++// int e_sparsify = 0;
++// int e_get_reds = 0;
+ 
+ #define myopt(name, var, fun, hhelp) \
+     program.add_argument(name) \
+@@ -95,7 +95,7 @@ int e_get_reds = 0;
+ 
+ void add_appmc_options()
+ {
+-    ApproxMC::AppMC tmp;
++    ApproxMC::AppMC tmp(fg);
+     epsilon = tmp.get_epsilon();
+     delta = tmp.get_delta();
+     simplify = tmp.get_simplify();
+@@ -115,26 +115,15 @@ void add_appmc_options()
+             "(1-d) = probability the count is within range as per epsilon parameter. "
+             "So d=0.2 means we are 80%% sure the count is within range as specified by epsilon. "
+             "The lower, the higher confidence we have in the count.");
+-    myopt("--ignore", ignore_sampl_set, atoi, "Ignore given sampling set and recompute it with Arjun");
+     myopt("--randbits", randfilename, string, "Read random bits from this file.");
+     myopt("--cert", certfilename, string, "Put certification of ApproxMC execution to this file.");
+ 
+-    /* arjun_options.add_options() */
+-    myopt("--arjun", do_arjun, atoi, "Use arjun to minimize sampling set");
+-    myopt("--arjundebug", debug_arjun, atoi, "Use CNF from Arjun, but use sampling set from CNF");
+-
+     /* improvement_options.add_options() */
+     myopt("--sparse", sparse, atoi,
+             "0 = (default) Do not use sparse method. 1 = Generate sparse XORs when possible.");
+     myopt("--reusemodels", reuse_models, atoi, "Reuse models while counting solutions");
+     myopt("--forcesolextension", force_sol_extension, atoi,
+             "Use trick of not extending solutions in the SAT solver to full solution");
+-    myopt("--withe", with_e, atoi, "Eliminate variables and simplify CNF as well");
+-    myopt("--eiter1", e_iter_1, atoi, "Num iters of E on 1st round");
+-    myopt("--eiter2", e_iter_2, atoi, "Num iters of E on 1st round");
+-    myopt("--evivif", e_vivif, atoi, "E vivif");
+-    myopt("--esparsif", e_sparsify, atoi, "E sparsify");
+-    myopt("--egetreds", e_get_reds, atoi, "Get redundant from E");
+ 
+     /* misc_options.add_options() */
+     myopt("--verbcls", verb_cls, atoi, "Print banning clause + xor clauses. Highly verbose.");
+@@ -165,7 +154,7 @@ void add_supported_options(int argc, char** argv) {
+     }
+ 
+     if (program["version"] == true) {
+-        cout << appmc->get_version_info();
++        cout << appmc->get_version_sha1();
+         exit(0);
+     }
+ }
+@@ -174,10 +163,10 @@ template<class T> void read_in_file(const string& filename, T* myreader)
+ {
+     #ifndef USE_ZLIB
+     FILE * in = fopen(filename.c_str(), "rb");
+-    DimacsParser<StreamBuffer<FILE*, FN>, T> parser(myreader, nullptr, verb);
++    DimacsParser<StreamBuffer<FILE*, FN>, T> parser(myreader, nullptr, verb, fg);
+     #else
+     gzFile in = gzopen(filename.c_str(), "rb");
+-    DimacsParser<StreamBuffer<gzFile, GZ>, T> parser(myreader, nullptr, verb);
++    DimacsParser<StreamBuffer<gzFile, GZ>, T> parser(myreader, nullptr, verb, fg);
+     #endif
+ 
+     if (in == nullptr) {
+@@ -240,9 +229,9 @@ template<class T> void read_stdin(T* myreader) {
+     }
+ 
+     #ifndef USE_ZLIB
+-    DimacsParser<StreamBuffer<FILE*, FN>, T> parser(myreader, nullptr, verb);
++    DimacsParser<StreamBuffer<FILE*, FN>, T> parser(myreader, nullptr, verb, fg);
+     #else
+-    DimacsParser<StreamBuffer<gzFile, GZ>, T> parser(myreader, nullptr, verb);
++    DimacsParser<StreamBuffer<gzFile, GZ>, T> parser(myreader, nullptr, verb, fg);
+     #endif
+ 
+     if (!parser.parse_DIMACS(in, false)) exit(-1);
+@@ -252,34 +241,20 @@ template<class T> void read_stdin(T* myreader) {
+     #endif
+ }
+ 
+-void print_num_solutions(uint32_t cell_sol_cnt, uint32_t hash_count, const mpz_class& mult)
+-{
++void print_num_solutions(uint32_t cell_sol_cnt, uint32_t hash_count, const std::unique_ptr<Field>& mult_ptr) {
++    const CMSat::Field* ptr = mult_ptr.get();
++    const ArjunNS::FMpq* mult = dynamic_cast<const ArjunNS::FMpq*>(ptr);
+     cout << "c [appmc] Number of solutions is: "
+-    << cell_sol_cnt << "*2**" << hash_count << "*" << mult << endl;
+-    if (cell_sol_cnt == 0) cout << "s UNSATISFIABLE" << endl;
++    << cell_sol_cnt << "*2**" << hash_count << "*" << mult->val << endl;
++    if (cell_sol_cnt == 0 || mult->val == 0) cout << "s UNSATISFIABLE" << endl;
+     else cout << "s SATISFIABLE" << endl;
+ 
+     mpz_class num_sols(2);
+     mpz_pow_ui(num_sols.get_mpz_t(), num_sols.get_mpz_t(), hash_count);
+     num_sols *= cell_sol_cnt;
+-    num_sols *= mult;
++    auto final = mult->val * num_sols;
+ 
+-    cout << "s mc " << num_sols << endl;
+-}
+-
+-void get_cnf_from_arjun() {
+-    const uint32_t orig_num_vars = arjun->get_orig_num_vars();
+-    appmc->new_vars(orig_num_vars);
+-    arjun->start_getting_constraints();
+-    vector<Lit> clause;
+-    bool is_xor, rhs;
+-    while (arjun->get_next_constraint(clause, is_xor, rhs)) {
+-        assert(!is_xor); assert(rhs);
+-        bool ok = true;
+-        for(auto l: clause) if (l.var() >= orig_num_vars) { ok = false; break; }
+-        if (ok) appmc->add_clause(clause);
+-    }
+-    arjun->end_getting_constraints();
++    cout << "s mc " << final << endl;
+ }
+ 
+ template<class T> void read_input_cnf(T* reader) {
+@@ -295,7 +270,7 @@ template<class T> void read_input_cnf(T* reader) {
+     } catch (std::logic_error& e) {
+         read_stdin(reader);
+     }
+-    if (!reader->get_sampl_vars_set()  || ignore_sampl_set) {
++    if (!reader->get_sampl_vars_set()) {
+         vector<uint32_t> all_vars;
+         for(uint32_t i = 0; i < reader->nVars(); i++) all_vars.push_back(i);
+         reader->set_sampl_vars(all_vars);
+@@ -359,18 +334,6 @@ void print_orig_sampling_vars(const vector<uint32_t>& orig_sampling_vars, T* ptr
+     }
+ }
+ 
+-void transfer_unit_clauses_from_arjun()
+-{
+-    vector<Lit> cl(1);
+-    auto units = arjun->get_zero_assigned_lits();
+-    for(const auto& unit: units) {
+-        if (unit.var() < appmc->nVars()) {
+-            cl[0] = unit;
+-            appmc->add_clause(cl);
+-        }
+-    }
+-}
+-
+ int main(int argc, char** argv)
+ {
+     #if defined(__GNUC__) && defined(__linux__)
+@@ -385,65 +348,22 @@ int main(int argc, char** argv)
+         if (i+1 < argc) command_line += " ";
+     }
+ 
+-    appmc = new ApproxMC::AppMC;
++    fg = std::make_unique<ArjunNS::FGenMpq>();
++    appmc = new ApproxMC::AppMC(fg);
+     add_supported_options(argc, argv);
+     if (verb) {
+-        cout << appmc->get_version_info();
++        cout << appmc->get_version_sha1();
+         cout << "c executed with command line: " << command_line << endl;
+     }
+     set_approxmc_options();
+ 
+-    if (do_arjun) {
+-        //Arjun-based minimization
+-        arjun = new ArjunNS::Arjun;
+-        arjun->set_seed(seed);
+-        arjun->set_verbosity(verb);
+-        arjun->set_simp(simplify);
+-        if (verb) cout << "c Arjun SHA revision " <<  arjun->get_version_info() << endl;
+-
+-        read_input_cnf(arjun);
+-        print_orig_sampling_vars(arjun->get_orig_sampl_vars(), arjun);
+-        auto debug_sampling_vars = arjun->get_orig_sampl_vars();
+-        auto sampl_vars = arjun->run_backwards();
+-        print_final_indep_set(sampl_vars, arjun->get_orig_sampl_vars().size(),
+-                arjun->get_empty_sampl_vars());
+-        if (with_e) {
+-            ArjunNS::SimpConf sc;
+-            sc.appmc = true;
+-            sc.oracle_vivify = e_vivif;
+-            sc.oracle_vivify_get_learnts = true;
+-            sc.oracle_sparsify = e_sparsify;
+-            sc.iter1 = e_iter_1;
+-            sc.iter2 = e_iter_2;
+-            const auto ret = arjun->get_fully_simplified_renumbered_cnf(sc);
+-            appmc->new_vars(ret.nvars);
+-            for(const auto& cl: ret.cnf) appmc->add_clause(cl);
+-            if (e_get_reds) for(const auto& cl: ret.red_cnf) appmc->add_red_clause(cl);
+-            sampl_vars = ret.sampl_vars;
+-            appmc->set_multiplier_weight(ret.multiplier_weight);
+-        } else {
+-            get_cnf_from_arjun();
+-            transfer_unit_clauses_from_arjun();
+-            mpz_class dummy(2);
+-            mpz_pow_ui(dummy.get_mpz_t(), dummy.get_mpz_t(), arjun->get_empty_sampl_vars().size());
+-            appmc->set_multiplier_weight(arjun->get_multiplier_weight()*dummy);
+-        }
+-        if (debug_arjun) {
+-            assert(!with_e && "Can't use debug and --withe at the same time");
+-            sampl_vars = debug_sampling_vars;
+-            appmc->set_multiplier_weight(1);
+-        }
+-        appmc->set_sampl_vars(sampl_vars);
+-        delete arjun;
+-    } else {
+-        read_input_cnf(appmc);
+-        print_final_indep_set(appmc->get_sampl_vars() , 0, vector<uint32_t>());
+-    }
++    read_input_cnf(appmc);
++    print_final_indep_set(appmc->get_sampl_vars() , 0, vector<uint32_t>());
+ 
+     ApproxMC::SolCount sol_count;
+     sol_count = appmc->count();
+     appmc->print_stats(start_time);
+-    cout << "c [appmc+arjun] Total time: " << (cpuTime() - start_time) << endl;
++    cout << "c [appmc] Total time: " << (cpuTime() - start_time) << endl;
+     print_num_solutions(sol_count.cellSolCount, sol_count.hashCount, appmc->get_multiplier_weight());
+ 
+     delete appmc;

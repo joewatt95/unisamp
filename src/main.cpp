@@ -137,8 +137,8 @@ void add_unisamp_options() {
          "So e=0.8 means we'll output at most 180%% of exact count and at "
          "least 55%% of exact count. "
          "Lower value means more precise.");
-  myopt2("-r", "--r-thresh-pivot", r_thresh_pivot, stod,
-         "Controls the ratio between the threshold and pivot. Default of 1.5.");
+  // myopt2("-r", "--r-thresh-pivot", r_thresh_pivot, stod,
+  //        "Controls the ratio between the threshold and pivot. Default of 1.5.");
   myopt2(
       "-d", "--delta", delta, stod,
       "Confidence parameter, i.e. how sure are we of the result? "
@@ -352,7 +352,7 @@ int main(int argc, char** argv) {
 
   // Our optimised delta
   appmc->set_delta((pow(r_thresh_pivot - 1, 2) * epsilon) /
-                   (3.19899995 * r_thresh_pivot * (1 + epsilon)));
+                   (4.0 * r_thresh_pivot * (1 + epsilon)));
 
   // Original delta from paper
   // appmc->set_delta(std::min(0.1, epsilon/4));

@@ -20,7 +20,7 @@
     },
     {
       "name": "approxmc",
-      "version>=": "v6-6213fb2"
+      "version>=": "v4-cert-6213fb2"
     },
     {
       "name": "arjun",
