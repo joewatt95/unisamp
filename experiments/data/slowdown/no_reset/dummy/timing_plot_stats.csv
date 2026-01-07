@@ -1,4 +1,4 @@
-# Command: ../build/unigen_static -e 0.3 -r 1.6 --samples {} benchmarks/dummy.cnf
+# Command: ../build/unisamp_static -e 0.3 -r 1.6 --samples {} benchmarks/dummy.cnf
 # Repetitions: 20
 # Parallel Workers: 8
 Value,Runs,Mean,Median,Min,Max

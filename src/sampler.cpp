@@ -130,7 +130,7 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
                                   uint32_t minSolutions, HashesModels* hm,
                                   vector<vector<int>>* out_solutions) {
   verb_print(1,
-             "[unig] "
+             "[unis] "
              "[ " << std::setw(7)
                   << std::setprecision(2) << std::fixed
                   << (cpuTimeTotal() - startTime) << " ]"
@@ -150,12 +150,12 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
   new_assumps.push_back(Lit(sol_ban_var, true));
 
   if (appmc->get_simplify() >= 2) {
-    verb_print(1, "[unig] inter-simplifying");
+    verb_print(1, "[unis] inter-simplifying");
     double myTime = cpuTime();
     solver->simplify(&new_assumps);
     solver->set_verbosity(0);
     total_inter_simp_time += cpuTime() - myTime;
-    verb_print(1, "[unig] inter-simp finished, total simp time: "
+    verb_print(1, "[unis] inter-simp finished, total simp time: "
                       << total_inter_simp_time);
   }
 
@@ -168,7 +168,7 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
     assert(ret == l_False || ret == l_True);
 
     if (conf.verb >= 2) {
-      cout << "c o [unig] bounded_sol_count ret: " << std::setw(7) << ret;
+      cout << "c o [unis] bounded_sol_count ret: " << std::setw(7) << ret;
       if (ret == l_True)
         cout << " sol no.  " << std::setw(3) << solutions;
       else
@@ -197,7 +197,7 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
       lits.push_back(Lit(var, solver->get_model()[var] == l_True));
     }
     if (conf.verb_sampler_cls)
-      cout << "c o [unig] Adding banning clause: " << lits << endl;
+      cout << "c o [unis] Adding banning clause: " << lits << endl;
     solver->add_clause(lits);
   }
 
@@ -239,12 +239,12 @@ bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
                                         HashesModels* hm,
                                         vector<vector<int>>* out_solutions) {
   verb_print(1,
-             "[unig] "
+             "[unis] "
              "[ " << std::setw(7)
                   << std::setprecision(2) << std::fixed
                   << (cpuTimeTotal() - startTime) << " ]"
                   << " bounded_sol_count looking for " << std::setw(4)
-                  << hiThresh + 1 << " solutions"
+                  << thresh + 1 << " solutions"
                   << " -- hashes active: " << hashCount);
 
   // Set up things for adding clauses that can later be removed
@@ -259,12 +259,12 @@ bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
   new_assumps.push_back(Lit(sol_ban_var, true));
 
   if (appmc->get_simplify() >= 2) {
-    verb_print(1, "[unig] inter-simplifying");
+    verb_print(1, "[unis] inter-simplifying");
     double myTime = cpuTime();
     solver->simplify(&new_assumps);
     solver->set_verbosity(0);
     total_inter_simp_time += cpuTime() - myTime;
-    verb_print(1, "[unig] inter-simp finished, total simp time: "
+    verb_print(1, "[unis] inter-simp finished, total simp time: "
                       << total_inter_simp_time);
   }
 
@@ -272,12 +272,12 @@ bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
   uint64_t solutions = repeat;
   double last_found_time = cpuTimeTotal();
   vector<vector<lbool>> models;
-  while (solutions < hiThresh + 1) {
+  while (solutions < thresh + 1) {
     lbool ret = solver->solve(&new_assumps, false);
     assert(ret == l_False || ret == l_True);
 
     if (conf.verb >= 2) {
-      cout << "c o [unig] bounded_sol_count ret: " << std::setw(7) << ret;
+      cout << "c o [unis] bounded_sol_count ret: " << std::setw(7) << ret;
       if (ret == l_True)
         cout << " sol no.  " << std::setw(3) << solutions;
       else
@@ -306,17 +306,17 @@ bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
       lits.push_back(Lit(var, solver->get_model()[var] == l_True));
     }
     if (conf.verb_sampler_cls)
-      cout << "c o [unig] Adding banning clause: " << lits << endl;
+      cout << "c o [unis] Adding banning clause: " << lits << endl;
     solver->add_clause(lits);
   }
 
   bool ok = false;
 
-  verb_print(1, "[unig] Number of solutions BSAT found: " << solutions);
+  verb_print(1, "[unis] Number of solutions BSAT found: " << solutions);
 
-  if (1 <= solutions && solutions <= hiThresh) {
+  if (1 <= solutions && solutions <= thresh) {
     const size_t index =
-        std::uniform_int_distribution<size_t>(0, hiThresh)(randomEngine);
+        std::uniform_int_distribution<size_t>(0, thresh)(randomEngine);
     if (index < models.size()) {
       const auto& model = models.at(index);
       callback_func(get_solution_ints(model), num_tries, callback_func_data);
@@ -345,36 +345,6 @@ void Sampler::sample(Config _conf, const ApproxMC::SolCount solCount,
   startTime = cpuTimeTotal();
   randomEngine.seed(appmc->get_seed());
 
-  /* Compute threshold via formula from TACAS-15 paper */
-  thresh_sampler_gen =
-      ceil(4.03 * (1 + (1 / conf.kappa)) * (1 + (1 / conf.kappa)));
-  verb_print(2, "[unig] threshold_Samplergen: " << thresh_sampler_gen);
-
-  if (solCount.hashCount == 0 && solCount.cellSolCount == 0) {
-    cout << "c o [unig] The input formula is unsatisfiable." << endl;
-    exit(-1);
-  }
-
-  double si = round(solCount.hashCount + log2(solCount.cellSolCount) +
-                    log2(1.8) - log2(thresh_sampler_gen)) -
-              2;
-  if (conf.verb > 3) cout << "c o si: " << si << endl;
-  if (si > 0)
-    startiter = si;
-  else
-    startiter = 0; /* Indicate ideal sampling case */
-
-  generate_samples(num_samples);
-}
-
-void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
-                             const uint32_t num_samples) {
-  conf = _conf;
-  solver = appmc->get_solver();
-  orig_num_vars = solver->nVars();
-  startTime = cpuTimeTotal();
-  randomEngine.seed(appmc->get_seed());
-
   // Our optimised pivot
   thresh_sampler_gen = 1.0 / (pow(conf.r_thresh_pivot - 1, 2) * conf.epsilon);
 
@@ -385,7 +355,7 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
                                                 << solCount.cellSolCount);
 
   if (solCount.hashCount == 0 && solCount.cellSolCount == 0) {
-    cout << "c o [unig] The input formula is unsatisfiable." << endl;
+    cout << "c o [unis] The input formula is unsatisfiable." << endl;
     exit(-1);
   }
 
@@ -406,7 +376,7 @@ void Sampler::sample_unisamp(Config _conf, const ApproxMC::SolCount solCount,
   else
     startiter = 0; /* Indicate ideal sampling case */
 
-  generate_samples_unisamp(num_samples);
+  generate_samples(num_samples);
 }
 
 vector<Lit> Sampler::set_num_hashes(uint32_t num_wanted,
@@ -427,7 +397,7 @@ vector<Lit> Sampler::set_num_hashes(uint32_t num_wanted,
 }
 
 void Sampler::simplify() {
-  verb_print(1, "[unig] simplifying");
+  verb_print(1, "[unis] simplifying");
   solver->set_sls(1);
   solver->set_intree_probe(1);
   solver->set_full_bve_iter_ratio(appmc->get_var_elim_ratio());
@@ -444,172 +414,37 @@ void Sampler::simplify() {
   // solver->set_scc(0);
 }
 
-void Sampler::generate_samples(const uint32_t num_samples_needed) {
-  double genStartTime = cpuTimeTotal();
-
-  hiThresh = ceil(1 + (1.4142136 * (1 + conf.kappa) * thresh_sampler_gen));
-  loThresh = floor(thresh_sampler_gen / (1.4142136 * (1 + conf.kappa)));
-  const uint32_t samplesPerCall = sols_to_return(num_samples_needed);
-  const uint32_t callsNeeded = num_samples_needed / samplesPerCall +
-                               (bool)(num_samples_needed % samplesPerCall);
-
-  verb_print(1, "[unig] Samples requested: " << num_samples_needed);
-  verb_print(1, "[unig] samples per XOR set:" << samplesPerCall);
-
-  // TODO WARNING what is this 14???????????????????
-  uint32_t callsPerLoop = std::min(solver->nVars() / 14, callsNeeded);
-  callsPerLoop = std::max(callsPerLoop, 1U);
-  // cout << "c [unig] callsPerLoop:" << callsPerLoop << endl;
-
-  verb_print(1, "[unig] starting sample generation."
-                    << " loThresh: " << loThresh << ", hiThresh: " << hiThresh
-                    << ", startiter: " << startiter);
-
-  uint32_t samples = 0;
-  if (startiter > 0) {
-    verb_print(1, "[unig] non-ideal sampling case");
-    uint32_t lastSuccessfulHashOffset = 0;
-    while (samples < num_samples_needed) {
-      samples += gen_n_samples(callsPerLoop, &lastSuccessfulHashOffset,
-                               num_samples_needed);
-    }
-  } else {
-    verb_print(1, "[unig] ideal sampling case");
-    vector<vector<int>> out_solutions;
-    const uint32_t count =
-        bounded_sol_count(
-            std::numeric_limits<uint32_t>::max()  // max no. solutions
-            ,
-            nullptr  // assumps is empty
-            ,
-            0  // number of hashes (information only)
-            ,
-            1  // min num. solutions
-            ,
-            nullptr  // gobal model (would be banned)
-            ,
-            &out_solutions)
-            .solutions;
-    assert(count > 0);
-
-    std::uniform_int_distribution<unsigned> uid{0, count - 1};
-    for (uint32_t i = 0; i < num_samples_needed; ++i) {
-      auto it = out_solutions.begin();
-      for (uint32_t j = uid(randomEngine); j > 0; --j) ++it;
-      samples++;
-      callback_func(*it, 1, callback_func_data);
-    }
-  }
-
-  verb_print(1, "[unig] Time to sample: "
-                    << cpuTimeTotal() - genStartTime << " s"
-                    << " -- Time count+samples: " << cpuTimeTotal() << " s");
-  verb_print(1, "[unig] Samples generated: " << samples);
-}
-
-uint32_t Sampler::gen_n_samples(const uint32_t num_calls,
-                                uint32_t* lastSuccessfulHashOffset,
-                                const uint32_t num_samples_needed) {
-  SparseData sparse_data(-1);
-  uint32_t num_samples = 0;
-  uint32_t i = 0;
-  while (i < num_calls) {
-    uint32_t hashOffsets[3];
-    hashOffsets[0] = *lastSuccessfulHashOffset;
-
-    // Specific values
-    if (hashOffsets[0] == 0) {  // Starting at q-2; go to q-1 then q
-      hashOffsets[1] = 1;
-      hashOffsets[2] = 2;
-    }
-    if (hashOffsets[0] == 2) {  // Starting at q; go to q-1 then q-2
-      hashOffsets[1] = 1;
-      hashOffsets[2] = 0;
-    }
-
-    map<uint64_t, Hash> hashes;
-    bool ok;
-    for (uint32_t j = 0; j < 3; j++) {
-      uint32_t currentHashOffset = hashOffsets[j];
-      uint32_t currentHashCount = currentHashOffset + startiter;
-      const vector<Lit> assumps = set_num_hashes(currentHashCount, hashes);
-      const uint64_t solutionCount =
-          bounded_sol_count(hiThresh  // max num solutions
-                            ,
-                            &assumps  // assumptions to use
-                            ,
-                            currentHashCount,
-                            loThresh  // min number of solutions (samples not
-                                      // output otherwise)
-                            )
-              .solutions;
-      ok = (solutionCount < hiThresh && solutionCount >= loThresh);
-      if (ok) {
-        num_samples += sols_to_return(num_samples_needed);
-        *lastSuccessfulHashOffset = currentHashOffset;
-        break;
-      }
-      // Number of solutions too small or too large
-
-      // At q-1, and need to pick next hash count
-      if (j == 0 && currentHashOffset == 1) {
-        if (solutionCount < loThresh) {
-          // Go to q-2; next will be q
-          hashOffsets[1] = 0;
-          hashOffsets[2] = 2;
-        } else {
-          // Go to q; next will be q-2
-          hashOffsets[1] = 2;
-          hashOffsets[2] = 0;
-        }
-      }
-    }
-
-    if (ok) {
-      i++;
-    }
-    if (appmc->get_simplify() >= 1) {
-      simplify();
-    }
-  }
-  return num_samples;
-}
-
-// TODO:
-// Create new Sampler class that just has thresh instead of hiThresh and
-// loThresh Then get rid of loThresh and rename hiThresh to thresh
-
-void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
+void Sampler::generate_samples(uint32_t num_samples_needed) {
   double genStartTime = cpuTimeTotal();
 
   // Our optimised thresh
-  hiThresh = ceil(conf.r_thresh_pivot * (1.0 + 2.0 * thresh_sampler_gen));
+  thresh = ceil(conf.r_thresh_pivot * (1.0 + 2.0 * thresh_sampler_gen));
 
   // Original thresh from paper
-  // hiThresh = 2 + 4 * ceil(thresh_sampler_gen);
+  // thresh = 2 + 4 * ceil(thresh_sampler_gen);
 
   // cout << "epsilon = " << conf.epsilon << endl;
   // cout << "r_thresh_pivot = " << conf.r_thresh_pivot << endl;
 
   // cout << "delta = " << appmc->get_delta() << endl;
   // cout << "pivot = " << thresh_sampler_gen << endl;
-  // cout << "thresh = " << hiThresh << endl;
+  // cout << "thresh = " << thresh << endl;
 
   // cout << "m = " << startiter << endl;
 
-  verb_print(1, "[unig] Samples requested: " << num_samples_needed);
+  verb_print(1, "[unis] Samples requested: " << num_samples_needed);
 
-  verb_print(1, "[unig] starting sample generation."
+  verb_print(1, "[unis] starting sample generation."
                     << " pivot: " << thresh_sampler_gen
-                    << ", threshold: " << hiThresh << ", m: " << startiter);
+                    << ", threshold: " << thresh << ", m: " << startiter);
 
   uint32_t num_samples = 0;
   if (startiter > 0) {
-    verb_print(1, "[unig] non-ideal sampling case");
+    verb_print(1, "[unis] non-ideal sampling case");
     while (num_samples < num_samples_needed)
-      num_samples += gen_n_samples_unisamp(num_samples_needed);
+      num_samples += gen_n_samples(num_samples_needed);
   } else {
-    verb_print(1, "[unig] ideal sampling case");
+    verb_print(1, "[unis] ideal sampling case");
     vector<vector<int>> out_solutions;
     const uint32_t count =
         bounded_sol_count(
@@ -636,10 +471,10 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
     }
   }
 
-  verb_print(1, "[unig] Time to sample: "
+  verb_print(1, "[unis] Time to sample: "
                     << cpuTimeTotal() - genStartTime << " s"
                     << " -- Time count+samples: " << cpuTimeTotal() << " s");
-  verb_print(1, "[unig] Samples generated: " << num_samples);
+  verb_print(1, "[unis] Samples generated: " << num_samples);
 }
 
 // Helper to reset the heuristics to aggressive state.
@@ -767,7 +602,7 @@ void Sampler::generate_samples_unisamp(uint32_t num_samples_needed) {
 //   }
 // }
 
-uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
+uint32_t Sampler::gen_n_samples(const uint32_t num_samples_needed) {
   SparseData sparse_data(-1);
   // Total number of samples obtained.
   uint32_t num_samples = 0;
@@ -796,7 +631,7 @@ uint32_t Sampler::gen_n_samples_unisamp(const uint32_t num_samples_needed) {
     if (ok) {
       num_samples++;
 
-      cout << "c o [unig] Found solution " << num_samples << " (out of "
+      cout << "c o [unis] Found solution " << num_samples << " (out of "
            << num_samples_needed << ") after a total of " << num_tries
            << " tries" << endl;
 
@@ -852,7 +687,7 @@ string Sampler::gen_rnd_bits(const uint32_t size,
 }
 
 void Sampler::print_xor(const vector<uint32_t>& vars, const uint32_t rhs) {
-  cout << "c o [unig] Added XOR ";
+  cout << "c o [unis] Added XOR ";
   bool first = true;
   for (const auto& var : vars) {
     if (!first) cout << " + ";
@@ -866,8 +701,6 @@ void Sampler::print_xor(const vector<uint32_t>& vars, const uint32_t rhs) {
 uint32_t Sampler::sols_to_return(uint32_t numSolutions) {
   if (startiter == 0)
     return numSolutions;
-  else if (conf.multisample)
-    return loThresh;
   else
     return 1;
 }

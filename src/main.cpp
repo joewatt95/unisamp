@@ -1,5 +1,5 @@
 /*
- UniGen
+ UniSamp
 
  Copyright (c) 2019-2020, Mate Soos and Kuldeep S. Meel. All rights reserved
  Copyright (c) 2015, Supratik Chakraborty, Daniel J. Fremont,
@@ -44,11 +44,9 @@
 #include <vector>
 
 #include "time_mem.h"
-#include "unigen.h"
 #include "unisamp.h"
 
 using namespace CMSat;
-using namespace UniGen;
 using namespace UniSamp;
 using std::cout;
 using std::endl;
@@ -57,10 +55,9 @@ using std::string;
 using std::vector;
 
 ApproxMC::AppMC* appmc = nullptr;
-UniG* unigen = nullptr;
 UniS* unisamp = nullptr;
 argparse::ArgumentParser program =
-    argparse::ArgumentParser("unigen", UniGen::UniG::get_version_sha1(),
+    argparse::ArgumentParser("unisamp", UniSamp::UniS::get_version_sha1(),
                              argparse::default_arguments::help);
 std::unique_ptr<CMSat::FieldGen> fg;
 
@@ -82,12 +79,9 @@ ArjunNS::SimpConf simp_conf;
 ArjunNS::Arjun::ElimToFileConf etof_conf;
 int with_e = 0;
 
-// UniGen
-uint32_t num_samples = 500;
-int multisample;
+// UniSamp
+uint32_t num_samples = 100;
 string sample_fname;
-double kappa =
-    0.638; /* Corresponds to UniGen's epsilon=16 in the TACAS-15 paper */
 bool verb_sampler_cls;
 
 #define myopt(name, var, fun, hhelp)                             \
@@ -103,7 +97,7 @@ bool verb_sampler_cls;
 
 void print_version() {
   std::stringstream ss;
-  cout << "c o UniGen SHA1: " << UniGen::UniG::get_version_sha1() << endl;
+  cout << "c o UniSamp SHA1: " << UniSamp::UniS::get_version_sha1() << endl;
   cout << "c o CMS SHA1: " << CMSat::SATSolver::get_version_sha1() << endl;
   cout << "c o Arjun SHA1: " << ArjunNS::Arjun ::get_version_sha1() << endl;
   cout << "c o Arjun SBVA SHA1: " << ArjunNS::Arjun::get_sbva_version_sha1()
@@ -117,7 +111,7 @@ void SIGINT_handler(int) {
   return;  // Perhaps we should output all the generated samples so far
 }
 
-void add_unigen_options() {
+void add_unisamp_options() {
   ApproxMC::AppMC tmp(fg);
   // epsilon = tmp.get_epsilon();
   delta = tmp.get_delta();
@@ -152,7 +146,6 @@ void add_unigen_options() {
       "So d=0.2 means we are 80%% sure the count is within range as specified "
       "by epsilon. "
       "The lower, the higher confidence we have in the count.");
-  myopt("--kappa", kappa, stod, "Uniformity parameter (see TACAS-15 paper)");
 
   myopt("--arjun", do_arjun, stoi, "Use arjun to minimize sampling set");
   myopt("--sparse", sparse, stoi, "Generate sparse XORs when possible");
@@ -164,8 +157,6 @@ void add_unigen_options() {
   myopt("--velimratio", var_elim_ratio, stod,
         "Variable elimination ratio for each simplify run");
   myopt("--samples", num_samples, stoi, "Number of random samples to generate");
-  myopt("--multisample", multisample, stoi,
-        "Return multiple samples from each call");
   myopt("--sampleout", sample_fname, string, "Write samples to this file");
   myopt("--verbsamplercls", verb_sampler_cls, stoi,
         "Print XOR constraints added for sampling");
@@ -174,7 +165,7 @@ void add_unigen_options() {
 }
 
 void parse_supported_options(int argc, char** argv) {
-  add_unigen_options();
+  add_unisamp_options();
   try {
     program.parse_args(argc, argv);
     if (program.is_used("--help")) {
@@ -297,7 +288,6 @@ int main(int argc, char** argv) {
 
   fg = std::make_unique<ArjunNS::FGenMpz>();
   appmc = new ApproxMC::AppMC(fg);
-  unigen = new UniG(appmc);
   unisamp = new UniS(appmc);
   simp_conf.appmc = true;
   simp_conf.oracle_sparsify = false;
@@ -369,12 +359,11 @@ int main(int argc, char** argv) {
 
   // Hack to disable multisampling in unigen, for a fairer comparison with
   // unisamp.
-  unigen->set_multisample(0);
+  // unigen->set_multisample(0);
 
   auto sol_count = appmc->count();
   unisamp->set_verbosity(verb);
   unisamp->set_verb_sampler_cls(verb_banning_cls);
-  // unigen->set_kappa(kappa);
   unisamp->set_full_sampling_vars(sampling_vars_orig);
 
   void* myfile = &std::cout;
@@ -395,7 +384,6 @@ int main(int argc, char** argv) {
   unisamp->set_callback(mycallback, myfile);
   unisamp->sample(&sol_count, num_samples);
 
-  delete unigen;
   delete unisamp;
   delete appmc;
 

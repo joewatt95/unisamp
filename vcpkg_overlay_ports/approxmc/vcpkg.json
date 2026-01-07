@@ -1,6 +1,6 @@
 {
   "name": "approxmc",
-  "version-string": "4.2.0-6213fb2",
+  "version-string": "v6-6213fb2",
   "homepage": "https://github.com/meelgroup/approxmc",
   "description": "Approximate Model Counter",
   "dependencies": [

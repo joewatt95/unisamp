@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta name="description" content="UniGen Approximate Sampler Your Browser">
-<meta name="keywords" content="UniGen, Approximately Probabilistic Uniform sampling, WebAssembly, JavaScript, Emscripten">
+<meta name="description" content="UniSamp Approximate Sampler Your Browser">
+<meta name="keywords" content="UniSamp, Approximately Probabilistic Uniform sampling, WebAssembly, JavaScript, Emscripten">
 <meta name="author" content="Mate Soos">
 <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UniGen in your browser</title>
+    <title>UniSamp in your browser</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -95,9 +95,9 @@
 </head>
 <body>
     <div class="container">
-        <h1>UniGen Approximate Uniform Sampler in Your Browser</h1>
+        <h1>UniSamp Approximate Uniform Sampler in Your Browser</h1>
         <div>Copy your CNF formula in the input box below and click "Run
-            unigen.js" to run the sampler. The output will be
+            unisamp.js" to run the sampler. The output will be
             displayed below the input box.  Format description is available <a
         href="https://jix.github.io/varisat/manual/0.2.0/formats/dimacs.html">here</a></div>
 
@@ -110,7 +110,7 @@
         </div>
 
         <div>
-            <button id="run-button">Run unigen.js</button>
+            <button id="run-button">Run unisamp.js</button>
             <button id="cancel-button">Cancel</button>
             <span id="status" class="status">Loading WebAssembly module...</span>
             <div class="progress-container">
@@ -120,7 +120,7 @@
 
         <div>
             <label for="output">Output:</label>
-            <div id="output">Ready - enter your input and click "Run unigen.js"</div>
+            <div id="output">Ready - enter your input and click "Run unisamp.js"</div>
         </div>
         <div>
             <label for="samples">Samples:</label>
@@ -159,7 +159,7 @@
                         console.log('Locating file:', path);
                         // Resolve correct path for WASM file
                         if (path.endsWith('.wasm')) {
-                            return self.workerOptions.wasmPath || 'unigen.wasm';
+                            return self.workerOptions.wasmPath || 'unisamp.wasm';
                         }
                         return path;
                     }
@@ -208,8 +208,8 @@
             document.getElementById('status').textContent = 'Running...';
 
             // Get absolute URL for WASM file
-            const wasmPath = new URL('unigen.wasm', window.location.href).href;
-            const jsPath = new URL('unigen.js', window.location.href).href;
+            const wasmPath = new URL('unisamp.wasm', window.location.href).href;
+            const jsPath = new URL('unisamp.js', window.location.href).href;
             const workerUrl = createEmscriptenWorker();
             const worker = new Worker(workerUrl);
 
@@ -256,9 +256,9 @@
             });
         });
 
-        // Load unigen.js in main thread
+        // Load unisamp.js in main thread
         const script = document.createElement('script');
-        script.src = 'unigen.js';
+        script.src = 'unisamp.js';
         document.body.appendChild(script);
     </script>
 </body>

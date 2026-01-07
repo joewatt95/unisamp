@@ -1,6 +1,6 @@
 from pycryptosat import Solver
 from pyapproxmc import Counter
-from pyunigen import Sampler
+from pyunisamp import Sampler
 
 
 def test():

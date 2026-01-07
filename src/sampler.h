@@ -37,7 +37,6 @@ Sampler
 #include <random>
 
 #include "config.h"
-#include "unigen.h"
 #include "unisamp.h"
 
 using ApproxMC::SolCount;
@@ -92,8 +91,6 @@ class Sampler {
  public:
   void sample(const Config conf, const SolCount sol_count,
               const uint32_t num_samples);
-  void sample_unisamp(const Config conf, const SolCount sol_count,
-                      const uint32_t num_samples);
   AppMC* appmc;
 
   // --- Dynamic Heuristic Fields ---
@@ -131,13 +128,12 @@ class Sampler {
   int samples_in_window;
 
   /// What to call on samples
-  UniGen::callback callback_func;
+  UniSamp::callback callback_func;
   void* callback_func_data;
 
  private:
   uint32_t startiter;
-  uint32_t loThresh = 1;
-  uint32_t hiThresh;
+  uint32_t thresh;
   double thresh_sampler_gen;
 
   Config conf;
@@ -145,14 +141,10 @@ class Sampler {
   uint32_t sols_to_return(uint32_t numSolutions);
   void add_sampler_options();
   bool gen_rhs();
-  uint32_t gen_n_samples(const uint32_t samples,
-                         uint32_t* lastSuccessfulHashOffset,
-                         const uint32_t num_samples_needed);
-  uint32_t gen_n_samples_unisamp(const uint32_t num_samples_needed);
+  uint32_t gen_n_samples(const uint32_t num_samples_needed);
   Hash add_hash(uint32_t total_num_hashes);
   string binary(const uint32_t x, const uint32_t length);
   void generate_samples(const uint32_t num_samples);
-  void generate_samples_unisamp(const uint32_t num_samples);
 
   // For dynamic backoff
   // void reset_heuristic_params();

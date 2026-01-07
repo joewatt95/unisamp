@@ -119,10 +119,10 @@ if __name__ == "__main__":
     except FileNotFoundError:
       pass
 
-    # Somehow setting "-e 0.3" doesn't affect anything even in the original unigen
+    # Somehow setting "-e 0.3" doesn't affect anything even in the original unisamp
     # algo. It looks like it's setting the epsilon in ApproxMC, rather than that of
-    # unigen.
-    run(['../build/unigen_static', '-e', '0.3', '--samples', f"{args.num_samples}",
+    # unisamp.
+    run(['../build/unisamp_static', '-e', '0.3', '--samples', f"{args.num_samples}",
          '--sampleout', samples_file, 'benchmarks/dummy.cnf'])
 
     # Run the main function

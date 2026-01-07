@@ -1,5 +1,5 @@
 {
-  "name": "unigen",
+  "name": "unisamp",
   "version-string": "2.7.0",
   "dependencies": [
     {
@@ -20,7 +20,7 @@
     },
     {
       "name": "approxmc",
-      "version>=": "4.2.0-6213fb2"
+      "version>=": "v6-6213fb2"
     },
     {
       "name": "arjun",

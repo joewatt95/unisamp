@@ -1,4 +1,4 @@
-# Command: ../build/unigen_static -e 0.3 -r {} --samples 100 benchmarks/LoginService.sk_20_34.cnf.gz.no_w.cnf
+# Command: ../build/unisamp_static -e 0.3 -r {} --samples 100 benchmarks/LoginService.sk_20_34.cnf.gz.no_w.cnf
 # Repetitions: 20
 # Parallel Workers: 8
 Value,Runs,Mean,Median,Min,Max

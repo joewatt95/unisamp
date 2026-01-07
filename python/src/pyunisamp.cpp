@@ -1,5 +1,5 @@
 /*************
-Python bindings for Unigen, heavily based on the Python bindings written for CryptoMiniSat
+Python bindings for Unisamp, heavily based on the Python bindings written for CryptoMiniSat
 
 Copyright (c) 2021 Eric Vin
               2022 Mate Soos
@@ -26,23 +26,22 @@ THE SOFTWARE.
 #include <Python.h>
 #include "../cryptominisat/src/cryptominisat.h"
 #include "../approxmc/src/approxmc.h"
-#include "../../src/unigen.h"
+#include "../../src/unisamp.h"
 
 #include <limits>
 
-#define MODULE_NAME "pyunigen"
-#define MODULE_DOC "Unigen almost uniform sampler."
+#define MODULE_NAME "pyunisamp"
+#define MODULE_DOC "Unisamp almost uniform sampler."
 
 struct PySampler {
     PyObject_HEAD
-    UniGen::UniG* unig = nullptr;
+    UniSamp::UniS* unis = nullptr;
     PyObject* sample_list = nullptr;
     ApproxMC::AppMC* appmc = nullptr;
 
     // config
     int verbosity = 0;
     uint32_t seed = 1;
-    double kappa;
     double epsilon;
     double delta;
     bool multisample = false;
@@ -57,14 +56,13 @@ struct PySampler {
 };
 
 static const char sampler_create_docstring[] = \
-"Sampler(verbosity=0, seed=1, delta=0.2, epsilon=0.8, kappa=0.638)\n\
+"Sampler(verbosity=0, seed=1, delta=0.2, epsilon=0.3)\n\
 Create Sampler object.\n\
 \n\
 :param verbosity: Verbosity level: 0: nothing printed; 15: very verbose.\n\
 :param seed: Random seed\n\
 :param delta: \n\
 :param epsilon: \n\
-:param kappa: Uniformity parameter (see TACAS-15 paper)\n\
 ";
 
 /********** Internal Functions **********/
@@ -144,14 +142,13 @@ static void setup_sampler(PySampler *self, PyObject *args, PyObject *kwds)
     self->samples_needed = 5;
     self->samples_generated = 0;
     self->appmc = new ApproxMC::AppMC;
-    self->unig = new UniGen::UniG(self->appmc);
+    self->unis = new UniSamp::UniS(self->appmc);
     self->epsilon = self->appmc->get_epsilon();
     self->delta = self->appmc->get_delta();
-    self->kappa = self->unig->get_kappa();
 
-    static char* kwlist[] = {"verbosity", "seed", "epsilon", "delta", "kappa", "multisample", nullptr};
+    static char* kwlist[] = {"verbosity", "seed", "epsilon", "delta", nullptr};
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iIdddp", kwlist,
-        &self->verbosity, &self->seed, &self->epsilon, &self->delta, &self->kappa, &self->multisample))
+        &self->verbosity, &self->seed, &self->epsilon, &self->delta))
     {
         return;
     }
@@ -169,21 +166,15 @@ static void setup_sampler(PySampler *self, PyObject *args, PyObject *kwds)
         return;
     }
 
-    if (self->kappa <= 0 || self->kappa >= 1) {
-        PyErr_SetString(PyExc_ValueError, "kappa must be greater than 0");
-        return;
-    }
-
     self->appmc->set_verbosity(self->verbosity);
     self->appmc->set_seed(self->seed);
     self->appmc->set_epsilon(self->epsilon);
     self->appmc->set_delta(self->delta);
 
-    self->unig->set_verbosity(self->verbosity);
-    self->unig->set_kappa(self->kappa);
-    self->unig->set_multisample(self->multisample);
+    self->unis->set_verbosity(self->verbosity);
+    self->unis->set_multisample(self->multisample);
 
-    self->unig->set_callback(pybinding_callback, self);
+    self->unis->set_callback(pybinding_callback, self);
 
     return;
 }
@@ -381,8 +372,8 @@ static PyObject* sample(PySampler *self, PyObject *args, PyObject *kwds)
         PyErr_SetString(PyExc_SystemError, "failed to create a list");
         return nullptr;
     }
-    self->unig->set_full_sampling_vars(self->sampling_set);
-    self->unig->sample(&sol_count, self->samples_needed);
+    self->unis->set_full_sampling_vars(self->sampling_set);
+    self->unis->sample(&sol_count, self->samples_needed);
 
     PyObject *result = PyTuple_New((Py_ssize_t) 3);
     if (result == nullptr) {
@@ -410,15 +401,15 @@ static PyMethodDef PySampler_methods[] = {
 
 static void PySampler_dealloc(PySampler* self)
 {
-    delete self->unig;
+    delete self->unis;
     delete self->appmc;
     Py_TYPE(self)->tp_free (static_cast<PyObject*>(self));
 }
 
 static int PySampler_init(PySampler *self, PyObject *args, PyObject *kwds)
 {
-    if (self->unig) {
-        delete self->unig;
+    if (self->unis) {
+        delete self->unis;
     }
 
     if (self->appmc) {
@@ -427,7 +418,7 @@ static int PySampler_init(PySampler *self, PyObject *args, PyObject *kwds)
 
     setup_sampler(self, args, kwds);
 
-    if (!self->unig) {
+    if (!self->unis) {
         return -1;
     }
 
@@ -438,10 +429,10 @@ static int PySampler_init(PySampler *self, PyObject *args, PyObject *kwds)
     return 0;
 }
 
-static PyTypeObject pyunigen_PySamplerType =
+static PyTypeObject pyunisamp_PySamplerType =
 {
     PyVarObject_HEAD_INIT(nullptr, 0)  /*ob_size*/
-    "pyunigen.Sampler",           /*tp_name*/
+    "pyunisamp.Sampler",           /*tp_name*/
     sizeof(PySampler),                /*tp_basicsize*/
     0,                              /*tp_itemsize*/
     static_cast<destructor>(PySampler_dealloc),    /*tp_dealloc*/
@@ -478,12 +469,12 @@ static PyTypeObject pyunigen_PySamplerType =
     static_cast<initproc>(PySampler_init),         /* tp_init */
 };
 
-PyMODINIT_FUNC PyInit_pyunigen(void)
+PyMODINIT_FUNC PyInit_pyunisamp(void)
 {
     PyObject* m;
 
-    pyunigen_PySamplerType.tp_new = PyType_GenericNew;
-    if (PyType_Ready(&pyunigen_PySamplerType) < 0) {
+    pyunisamp_PySamplerType.tp_new = PyType_GenericNew;
+    if (PyType_Ready(&pyunisamp_PySamplerType) < 0) {
         // Return nullptr on Python3 and on Python2 with MODULE_INIT_FUNC macro
         // In pure Python2: return nothing.
         return nullptr;
@@ -504,23 +495,23 @@ PyMODINIT_FUNC PyInit_pyunigen(void)
     m = PyModule_Create(&moduledef);
     if (!m) return nullptr;
 
-    // Add the version string so users know what version of UniGen
+    // Add the version string so users know what version of UniSamp
     // they're using.
 #if defined(_MSC_VER)
 #else
-    if (PyModule_AddStringConstant(m, "__version__", UNIGEN_FULL_VERSION) == -1) {
+    if (PyModule_AddStringConstant(m, "__version__", UNISAMP_FULL_VERSION) == -1) {
         Py_DECREF(m);
         return nullptr;
     }
-    if (PyModule_AddStringConstant(m, "VERSION", UNIGEN_FULL_VERSION) == -1) {
+    if (PyModule_AddStringConstant(m, "VERSION", UNISAMP_FULL_VERSION) == -1) {
         Py_DECREF(m);
         return nullptr;
     }
 #endif
 
     // Add the PySampler type
-    Py_INCREF(&pyunigen_PySamplerType);
-    if (PyModule_AddObject(m, "Sampler", (PyObject *)&pyunigen_PySamplerType)) {
+    Py_INCREF(&pyunisamp_PySamplerType);
+    if (PyModule_AddObject(m, "Sampler", (PyObject *)&pyunisamp_PySamplerType)) {
         Py_DECREF(m);
         return nullptr;
     }

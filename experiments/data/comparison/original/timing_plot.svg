@@ -1323,7 +1323,7 @@ z
    </g>
   </g>
   <g id="text_14">
-   <!-- Command: ../build/unigen_static -e 0.3 - -samples 100 benchmarks/{}.cnf (reps=20, workers=8) -->
+   <!-- Command: ../build/unisamp_static -e 0.3 - -samples 100 benchmarks/{}.cnf (reps=20, workers=8) -->
    <g transform="translate(118.913281 47.918437) scale(0.1 -0.1)">
     <defs>
      <path id="DejaVuSans-3a" d="M 750 794 

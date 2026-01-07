@@ -44,16 +44,15 @@ endif()
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/GitSHA1.cpp.in"
     "${CMAKE_CURRENT_BINARY_DIR}/GitSHA1.cpp" @ONLY)
 
-set(unigen_lib_files
+set(unisamp_lib_files
   sampler.cpp
-  unigen.cpp
   unisamp.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/GitSHA1.cpp
 )
 
-add_library(unigen ${unigen_lib_files})
+add_library(unisamp ${unisamp_lib_files})
 
-target_link_libraries(unigen PUBLIC
+target_link_libraries(unisamp PUBLIC
   ${CRYPTOMINISAT5_LIBRARIES}
   ${ARJUN_LIBRARIES}
   ${APPROXMC_LIBRARIES}
@@ -61,47 +60,47 @@ target_link_libraries(unigen PUBLIC
   # ${GMP_LIBRARY}
 )
 
-set_target_properties(unigen PROPERTIES
-  PUBLIC_HEADER "${unigen_public_headers}"
+set_target_properties(unisamp PROPERTIES
+  PUBLIC_HEADER "${unisamp_public_headers}"
   VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
   SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}
   INSTALL_RPATH_USE_LINK_PATH TRUE
 )
 
-add_executable(unigen_dynamic main.cpp)
-set(unigen_exec_link_libs "unigen")
+add_executable(unisamp_dynamic main.cpp)
+set(unisamp_exec_link_libs "unisamp")
 IF (ZLIB_FOUND)
-  set(unigen_exec_link_libs ${unigen_exec_link_libs} ${ZLIB_LIBRARY})
+  set(unisamp_exec_link_libs ${unisamp_exec_link_libs} ${ZLIB_LIBRARY})
 ENDIF()
-target_link_libraries(unigen_dynamic ${unigen_exec_link_libs})
+target_link_libraries(unisamp_dynamic ${unisamp_exec_link_libs})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    set_target_properties(unigen_dynamic PROPERTIES
-      # OUTPUT_NAME unigen
+    set_target_properties(unisamp_dynamic PROPERTIES
+      # OUTPUT_NAME unisamp
       RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}
       INSTALL_RPATH_USE_LINK_PATH TRUE
       LINK_FLAGS "-s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='[\"callMain\", \"ccall\", \"cwrap\", \"FS\", \"print\"]' -s FORCE_FILESYSTEM=1"
     )
 else()
-    set_target_properties(unigen_dynamic PROPERTIES
-      # OUTPUT_NAME unigen
+    set_target_properties(unisamp_dynamic PROPERTIES
+      # OUTPUT_NAME unisamp
       RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}
       INSTALL_RPATH_USE_LINK_PATH TRUE
     )
 endif()
 
-unigen_add_public_header(unigen ${CMAKE_CURRENT_SOURCE_DIR}/unigen.h)
+unisamp_add_public_header(unisamp ${CMAKE_CURRENT_SOURCE_DIR}/unisamp.h)
 
 # -----------------------------------------------------------------------------
 # Copy public headers into build directory include directory.
-# The unigenConfig.cmake we generate in the build directory depends on
+# The unisampConfig.cmake we generate in the build directory depends on
 # this.
 # -----------------------------------------------------------------------------
-set(HEADER_DEST "${PROJECT_BINARY_DIR}/include/unigen")
+set(HEADER_DEST "${PROJECT_BINARY_DIR}/include/unisamp")
 add_custom_target(CopyPublicHeaders ALL)
-get_target_property(unigen_public_headers unigen PUBLIC_HEADER)
-foreach(public_header ${unigen_public_headers})
+get_target_property(unisamp_public_headers unisamp PUBLIC_HEADER)
+foreach(public_header ${unisamp_public_headers})
     get_filename_component(HEADER_NAME ${public_header} NAME)
     add_custom_command(TARGET CopyPublicHeaders PRE_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${HEADER_DEST}"
@@ -110,15 +109,15 @@ foreach(public_header ${unigen_public_headers})
     )
 endforeach()
 
-install(TARGETS unigen
-    EXPORT ${UNIGEN_EXPORT_NAME}
+install(TARGETS unisamp
+    EXPORT ${UNISAMP_EXPORT_NAME}
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/unigen"
+    PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/unisamp"
 )
 
-install(TARGETS unigen_dynamic
-    EXPORT ${UNIGEN_EXPORT_NAME}
+install(TARGETS unisamp_dynamic
+    EXPORT ${UNISAMP_EXPORT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

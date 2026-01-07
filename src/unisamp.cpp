@@ -79,11 +79,11 @@ DLL_PUBLIC void UniS::sample(const SolCount* sol_count, uint32_t num_samples) {
          << endl;
     exit(-1);
   }
-  data->sampler.sample_unisamp(data->conf, *sol_count, num_samples);
+  data->sampler.sample(data->conf, *sol_count, num_samples);
 }
 
 DLL_PUBLIC string UniS::get_version_sha1() {
-  return UnigenIntNS::get_version_sha1();
+  return UnisampIntNS::get_version_sha1();
 }
 
 set_get_macro(double, epsilon) set_get_macro(double, r_thresh_pivot)

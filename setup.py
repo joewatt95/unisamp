@@ -48,20 +48,20 @@ picosatlib = ('picosatlib', {
 
 def gen_modules(version):
     if platform == "win32" or platform == "cygwin":
-        extra_compile_args_val = ['/std:c++17', "/DCMS_LOCAL_BUILD=1", "/DUNIGEN_FULL_VERSION=\""+version+"\""]
+        extra_compile_args_val = ['/std:c++17', "/DCMS_LOCAL_BUILD=1", "/DUNISAMP_FULL_VERSION=\""+version+"\""]
         define_macros_val = [("TRACE", "")]
 
     else:
         extra_compile_args_val = ['-std=c++17']
-        define_macros_val = [('CMS_LOCAL_BUILD', 1),("TRACE", ""),("UNIGEN_FULL_VERSION", "\""+version+"\"")]
+        define_macros_val = [('CMS_LOCAL_BUILD', 1),("TRACE", ""),("UNISAMP_FULL_VERSION", "\""+version+"\"")]
 
     modules = Extension(
-        name = "pyunigen",
+        name = "pyunisamp",
         sources = [
                    "src/sampler.cpp",
-                   "src/unigen.cpp",
+                   "src/unisamp.cpp",
                    "python/src/GitSHA1.cpp",
-                   "python/src/pyunigen.cpp",
+                   "python/src/pyunisamp.cpp",
                    "python/approxmc/src/approxmc.cpp",
                    "python/approxmc/src/appmc_constants.cpp",
                    "python/approxmc/src/counter.cpp",

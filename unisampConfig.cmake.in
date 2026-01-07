@@ -1,0 +1,20 @@
+# Config file for the @EXPORT_TYPE@ cryptominisat Package
+# It defines the following variables
+#  UNISAMP_INCLUDE_DIRS - include directories for cryptominisat5
+#  UNISAMP_LIBRARIES    - libraries to link against
+#  UNISAMP_EXECUTABLE   - the cryptominisat executable
+
+# Compute paths
+get_filename_component(UNISAMP_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+set(UNISAMP_INCLUDE_DIRS "@CONF_INCLUDE_DIRS@")
+
+# Our library dependencies (contains definitions for IMPORTED targets)
+include("${UNISAMP_CMAKE_DIR}/@UNISAMP_TARGETS_FILENAME@")
+
+# These are IMPORTED targets created by @SCALMC_TARGETS_FILENAME@
+set(UNISAMP_LIBRARIES unisamp)
+set(UNISAMP_STATIC_LIBRARIES unisamp)
+set(UNISAMP_STATIC_LIBRARIES_DEPS @UNISAMP_STATIC_DEPS@)
+set(UNISAMP_VERSION_MAJOR @PROJECT_VERSION_MAJOR@)
+set(UNISAMP_VERSION_MINOR @PROJECT_VERSION_MINOR@)
+set(UNISAMP_EXECUTABLE unisamp)

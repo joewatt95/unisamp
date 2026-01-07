@@ -1,13 +1,13 @@
-# pyunigen: bindings to the UniGen almost uniform sampler
+# pyunisamp: bindings to the UniSamp almost uniform sampler
 
-This directory provides Python bindings to UniGen on the C++ level,
+This directory provides Python bindings to UniSamp on the C++ level,
 i.e. when importing pycryptosat, the CryptoMiniSat solver becomes part of the
 Python process itself.
 
 ## Installing
 
 ```
-pip install pyunigen
+pip install pyunisamp
 ```
 
 ## Compiling
@@ -26,7 +26,7 @@ You will then find the files under "dist/".
 
 ## Usage
 
-The `pyunigen` module has one object, `Sampler` that has two functions
+The `pyunisamp` module has one object, `Sampler` that has two functions
 `sample` and `add_clause`.
 
 The funcion `add_clause()` takes an iterable list of literals such as
@@ -37,7 +37,7 @@ The function `sample()` samples the system of equations that have been added
 with `add_clause()`:
 
 ```
->>> from pyunigen import Sampler
+>>> from pyunisamp import Sampler
 >>> c = Sampler()
 >>> c.add_clause([1, 5])
 >>> c.add_clause([10, 11, 12])

@@ -22,19 +22,19 @@ THE SOFTWARE.
 
 #include "../../src/GitSHA1.h"
 
-const char* UnigenIntNS::get_version_sha1()
+const char* UnisampIntNS::get_version_sha1()
 {
     static const char myversion_sha1[] = "python-build";
     return myversion_sha1;
 }
 
-const char* UnigenIntNS::get_version_tag()
+const char* UnisampIntNS::get_version_tag()
 {
     static const char myversion_tag[] = "see-python-package-version";
     return myversion_tag;
 }
 
-const char* UnigenIntNS::get_compilation_env()
+const char* UnisampIntNS::get_compilation_env()
 {
     static const char compilation_env[] = "python-build"
     ;

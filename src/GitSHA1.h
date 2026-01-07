@@ -23,12 +23,12 @@ THE SOFTWARE.
 #ifndef GITSHA1_H
 #define GITSHA1_H
 
-namespace UnigenIntNS {
+namespace UnisampIntNS {
 
 const char* get_version_sha1();
 const char* get_version_tag();
 const char* get_compilation_env();
 
-}  // namespace UnigenIntNS
+}  // namespace UnisampIntNS
 
 #endif  // GITSHA1_H

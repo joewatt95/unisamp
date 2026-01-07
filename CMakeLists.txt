@@ -73,7 +73,7 @@ foreach (build_config ${build_types})
     endforeach()
 endforeach()
 
-project(unigen)
+project(unisamp)
 
 enable_language(CXX)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -84,16 +84,15 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-add_executable(unigen_static
+add_executable(unisamp_static
   ${PROJECT_SOURCE_DIR}/src/main.cpp
   ${PROJECT_SOURCE_DIR}/src/sampler.cpp
-  ${PROJECT_SOURCE_DIR}/src/unigen.cpp
   ${PROJECT_SOURCE_DIR}/src/unisamp.cpp
-  ${CMAKE_CURRENT_BINARY_DIR}/src-unigen/GitSHA1.cpp
+  ${CMAKE_CURRENT_BINARY_DIR}/src-unisamp/GitSHA1.cpp
 )
-# target_link_libraries(unigen PRIVATE gmp zlib mpfr cereal armadillo ensmallen mlpack)
+# target_link_libraries(unisamp PRIVATE gmp zlib mpfr cereal armadillo ensmallen mlpack)
 
-target_link_libraries(unigen_static PRIVATE
+target_link_libraries(unisamp_static PRIVATE
   ZLIB::ZLIB cryptominisat5 approxmc arjun
 )
 
@@ -331,9 +330,9 @@ if ((${CMAKE_SYSTEM_NAME} MATCHES "Linux") OR (${CMAKE_SYSTEM_NAME} MATCHES "Dar
     endif()
 endif()
 
-set(DEF_INSTALL_CMAKE_DIR lib/cmake/unigen)
-set(UNIGEN_INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH
-    "Installation directory for unigen CMake files")
+set(DEF_INSTALL_CMAKE_DIR lib/cmake/unisamp)
+set(UNISAMP_INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH
+    "Installation directory for unisamp CMake files")
 
 # -----------------------------------------------------------------------------
 # Add GIT version
@@ -355,10 +354,10 @@ if (GIT_EXECUTABLE)
 else()
   set(GIT_SHA "GIT-hash-notfound")
 endif()
-set(UNIGEN_FULL_VERSION "2.7.0")
+set(UNISAMP_FULL_VERSION "2.7.0")
 
-string(REPLACE "." ";" UNIGEN_FULL_VERSION_LIST ${UNIGEN_FULL_VERSION})
-SetVersionNumber("PROJECT" ${UNIGEN_FULL_VERSION_LIST})
+string(REPLACE "." ";" UNISAMP_FULL_VERSION_LIST ${UNISAMP_FULL_VERSION})
+SetVersionNumber("PROJECT" ${UNISAMP_FULL_VERSION_LIST})
 message(STATUS "PROJECT_VERSION: ${PROJECT_VERSION}")
 message(STATUS "PROJECT_VERSION_MAJOR: ${PROJECT_VERSION_MAJOR}")
 message(STATUS "PROJECT_VERSION_MINOR: ${PROJECT_VERSION_MINOR}")
@@ -370,15 +369,15 @@ message(STATUS "PROJECT_VERSION_PATCH: ${PROJECT_VERSION_PATCH}")
 # if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" AND NOT EMSCRIPTEN)
 #     find_program(HELP2MAN_FOUND help2man)
 #     if (HELP2MAN_FOUND)
-#         ADD_CUSTOM_TARGET(man_unigen ALL DEPENDS unigen-bin)
+#         ADD_CUSTOM_TARGET(man_unisamp ALL DEPENDS unisamp-bin)
 #         ADD_CUSTOM_COMMAND(
 #             POST_BUILD
-#             TARGET man_unigen
+#             TARGET man_unisamp
 #             COMMAND help2man
-#             ARGS --version-string=${UNIGEN_FULL_VERSION} --help-option="-h" $<TARGET_FILE:unigen-bin> -o ${CMAKE_CURRENT_BINARY_DIR}/unigen.1
+#             ARGS --version-string=${UNISAMP_FULL_VERSION} --help-option="-h" $<TARGET_FILE:unisamp-bin> -o ${CMAKE_CURRENT_BINARY_DIR}/unisamp.1
 #         )
 #         INSTALL(
-#             FILES ${CMAKE_CURRENT_BINARY_DIR}/unigen.1
+#             FILES ${CMAKE_CURRENT_BINARY_DIR}/unisamp.1
 #             DESTINATION ${CMAKE_INSTALL_PREFIX}/man/man1)
 #         message(STATUS "Manpage will be created and installed")
 #     else()
@@ -403,7 +402,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
 # -----------------------------------------------------------------------------
 # headers
 # -----------------------------------------------------------------------------
-macro(unigen_add_public_header LIBTARGET HEADER)
+macro(unisamp_add_public_header LIBTARGET HEADER)
     get_target_property(EXISTING_PUBLIC_HEADERS ${LIBTARGET} PUBLIC_HEADER)
     if(EXISTING_PUBLIC_HEADERS)
         list(APPEND EXISTING_PUBLIC_HEADERS "${HEADER}")
@@ -442,9 +441,9 @@ find_package(arjun CONFIG REQUIRED)
 # -----------------------------------------------------------------------------
 # Provide an export name to be used by targets that wish to export themselves.
 # -----------------------------------------------------------------------------
-set(UNIGEN_EXPORT_NAME "unigenTargets")
+set(UNISAMP_EXPORT_NAME "unisampTargets")
 
-add_subdirectory(src src-unigen)
+add_subdirectory(src src-unisamp)
 
 # -----------------------------------------------------------------------------
 # Add uninstall target for makefiles
@@ -476,48 +475,48 @@ endif()
 
 # -----------------------------------------------------------------------------
 # Export our targets so that other CMake based projects can interface with
-# the build of unigen in the build-tree
+# the build of unisamp in the build-tree
 # -----------------------------------------------------------------------------
-set(UNIGEN_TARGETS_FILENAME "unigenTargets.cmake")
-set(UNIGEN_CONFIG_FILENAME "unigenConfig.cmake")
+set(UNISAMP_TARGETS_FILENAME "unisampTargets.cmake")
+set(UNISAMP_CONFIG_FILENAME "unisampConfig.cmake")
 
 # Export targets
-set(MY_TARGETS unigen)
+set(MY_TARGETS unisamp)
 export(
     TARGETS ${MY_TARGETS}
-    FILE "${CMAKE_CURRENT_BINARY_DIR}/${UNIGEN_TARGETS_FILENAME}"
+    FILE "${CMAKE_CURRENT_BINARY_DIR}/${UNISAMP_TARGETS_FILENAME}"
 )
 
-# Create unigenConfig file
+# Create unisampConfig file
 set(EXPORT_TYPE "Build-tree")
 set(CONF_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/include")
-configure_file(unigenConfig.cmake.in
-    "${CMAKE_CURRENT_BINARY_DIR}/${UNIGEN_CONFIG_FILENAME}" @ONLY
+configure_file(unisampConfig.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/${UNISAMP_CONFIG_FILENAME}" @ONLY
 )
 
 # Export this package to the CMake user package registry
 # Now the user can just use find_package(cryptominisat5) on their system
-export(PACKAGE unigen)
+export(PACKAGE unisamp)
 
-set(DEF_INSTALL_CMAKE_DIR lib/cmake/unigen)
-set(UNIGEN_INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH
-    "Installation directory for unigen CMake files")
+set(DEF_INSTALL_CMAKE_DIR lib/cmake/unisamp)
+set(UNISAMP_INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH
+    "Installation directory for unisamp CMake files")
 
 
-# Create unigenConfig file
+# Create unisampConfig file
 set(EXPORT_TYPE "installed")
 set(CONF_INCLUDE_DIRS "${CMAKE_INSTALL_PREFIX}/include")
-configure_file(unigenConfig.cmake.in
-   "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_FILES_DIRECTORY}/${UNIGEN_CONFIG_FILENAME}" @ONLY
+configure_file(unisampConfig.cmake.in
+   "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_FILES_DIRECTORY}/${UNISAMP_CONFIG_FILENAME}" @ONLY
 )
 
 install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_FILES_DIRECTORY}/${UNIGEN_CONFIG_FILENAME}"
-    DESTINATION "${UNIGEN_INSTALL_CMAKE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_FILES_DIRECTORY}/${UNISAMP_CONFIG_FILENAME}"
+    DESTINATION "${UNISAMP_INSTALL_CMAKE_DIR}"
 )
 
 # Install the export set for use with the install-tree
 install(
-    EXPORT ${UNIGEN_EXPORT_NAME}
-    DESTINATION "${UNIGEN_INSTALL_CMAKE_DIR}"
+    EXPORT ${UNISAMP_EXPORT_NAME}
+    DESTINATION "${UNISAMP_INSTALL_CMAKE_DIR}"
 )
