@@ -42,7 +42,8 @@ class SolCount;
 
 namespace UniSamp {
 
-typedef std::function<void(const std::vector<int>& solution, uint32_t num_tries, void* data)>
+typedef std::function<void(const std::vector<int>& solution, uint32_t num_tries,
+                           void* data)>
     callback;
 
 struct UniSampPrivateData;
@@ -58,6 +59,10 @@ class UniS
   static std::string get_version_sha1();
 
   void sample(const ApproxMC::SolCount* sol_count, uint32_t num_samples);
+
+  // For certification
+  void setup_randbits(std::string log_file_name);
+  void setup_cert(std::string cert_file_name);
 
   // Misc options -- do NOT to change unless you know what you are doing!
   void set_epsilon(double epsilon);

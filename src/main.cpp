@@ -84,15 +84,19 @@ uint32_t num_samples = 100;
 string sample_fname;
 bool verb_sampler_cls;
 
-#define myopt(name, var, fun, hhelp)                             \
-  program.add_argument(name)                                     \
-      .action([&](const auto& a) { var = std::fun(a); })          \
-      .default_value(var)                                        \
+// For certification
+string rand_file_name;
+string cert_file_name;
+
+#define myopt(name, var, fun, hhelp)                     \
+  program.add_argument(name)                             \
+      .action([&](const auto& a) { var = std::fun(a); }) \
+      .default_value(var)                                \
       .help(hhelp)
-#define myopt2(name1, name2, var, fun, hhelp)                    \
-  program.add_argument(name1, name2)                             \
-      .action([&](const auto& a) { var = std::fun(a); })          \
-      .default_value(var)                                        \
+#define myopt2(name1, name2, var, fun, hhelp)            \
+  program.add_argument(name1, name2)                     \
+      .action([&](const auto& a) { var = std::fun(a); }) \
+      .default_value(var)                                \
       .help(hhelp)
 
 void print_version() {
@@ -137,8 +141,6 @@ void add_unisamp_options() {
          "So e=0.8 means we'll output at most 180%% of exact count and at "
          "least 55%% of exact count. "
          "Lower value means more precise.");
-  // myopt2("-r", "--r-thresh-pivot", r_thresh_pivot, stod,
-  //        "Controls the ratio between the threshold and pivot. Default of 1.5.");
   myopt2(
       "-d", "--delta", delta, stod,
       "Confidence parameter, i.e. how sure are we of the result? "
@@ -160,6 +162,12 @@ void add_unisamp_options() {
   myopt("--sampleout", sample_fname, string, "Write samples to this file");
   myopt("--verbsamplercls", verb_sampler_cls, stoi,
         "Print XOR constraints added for sampling");
+
+  // For certification
+  myopt("--randbits", rand_file_name, string,
+        "Read random bits from this file.");
+  myopt("--cert", cert_file_name, string,
+        "Put certification of Unisamp execution to this file.");
 
   program.add_argument("inputfile").remaining().help("input CNF");
 }
@@ -308,6 +316,16 @@ int main(int argc, char** argv) {
   appmc->set_simplify(simplify);
   appmc->set_var_elim_ratio(var_elim_ratio);
   vector<uint32_t> sampling_vars_orig;
+
+  if (rand_file_name != "") {
+    unisamp->setup_randbits(rand_file_name);
+    cout << "c [unis] random bits file set " << rand_file_name << endl;
+  }
+
+  if (cert_file_name != "") {
+    unisamp->setup_cert(cert_file_name);
+    cout << "c [unis] certification file set " << cert_file_name << endl;
+  }
 
   const auto& files = program.get<std::vector<std::string>>("inputfile");
   if (files.empty()) {

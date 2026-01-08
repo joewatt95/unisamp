@@ -32,6 +32,7 @@ Sampler
 #include <cryptominisat5/cryptominisat.h>
 
 #include <cstdint>
+#include <fstream>
 #include <map>
 #include <optional>
 #include <random>
@@ -165,6 +166,10 @@ class Sampler {
 
   void simplify();
 
+  // For certification
+  void open_rand_file();
+  void open_cert_file();
+
   ////////////////
   // Helper functions
   ////////////////
@@ -198,4 +203,9 @@ class Sampler {
   uint32_t orig_num_vars;
   double total_inter_simp_time = 0;
   uint32_t threshold;  // precision, it's computed
+
+  // For certification
+  uint32_t base_rand = 0;
+  std::ifstream rand_file;
+  std::ofstream cert_file;
 };

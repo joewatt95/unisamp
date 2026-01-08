@@ -37,4 +37,8 @@ struct Config {
   double epsilon = 0.3;
   double r_thresh_pivot = 1.5;
   std::vector<uint32_t> full_sampling_vars;
+
+  // For certification
+  std::string rand_file_name = "";
+  std::string cert_file_name = "";
 };

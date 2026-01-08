@@ -72,6 +72,16 @@ DLL_PUBLIC void UniS::set_callback(UniSamp::callback _callback_func,
   data->sampler.callback_func_data = _callback_func_data;
 }
 
+DLL_PUBLIC void UniS::setup_randbits(string rand_file_name)
+{
+    data->conf.rand_file_name = rand_file_name;
+}
+
+DLL_PUBLIC void UniS::setup_cert(string cert_file_name)
+{
+    data->conf.cert_file_name = cert_file_name;
+}
+
 DLL_PUBLIC void UniS::sample(const SolCount* sol_count, uint32_t num_samples) {
   if (!data->sampler.callback_func) {
     cout << "ERROR! You must set the callback function or your samples will be "

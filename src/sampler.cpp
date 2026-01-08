@@ -51,26 +51,103 @@ using std::endl;
 using std::map;
 using std::optional;
 using std::set;
+using std::ios;
 
+// Hash Sampler::add_hash(uint32_t hash_index) {
+//   const auto randomBits =
+//       gen_rnd_bits(appmc->get_sampling_set().size(), hash_index);
+
+//   vector<uint32_t> vars;
+//   uint32_t i = 0;
+//   for (const auto& sampling_var : appmc->get_sampling_set()) {
+//     if (randomBits[i] == '1') vars.push_back(sampling_var);
+//     i++;
+//   }
+
+//   solver->new_var();
+//   const uint32_t act_var = solver->nVars() - 1;
+//   const bool rhs = gen_rhs();
+//   Hash h(act_var, vars, rhs);
+
+//   vars.push_back(act_var);
+//   solver->add_xor_clause(vars, rhs);
+//   if (conf.verb_sampler_cls) print_xor(vars, rhs);
+//   return h;
+// }
+
+void Sampler::open_rand_file() {
+  if (!conf.rand_file_name.empty()) {
+    rand_file.open(conf.rand_file_name.c_str(), ios::binary | ios::in);
+    if (!rand_file.is_open()) {
+      cout << "[unis] Cannot open Counter random bits file '"
+           << conf.rand_file_name << "' for reading." << endl;
+      exit(1);
+    }
+  }
+}
+
+void Sampler::open_cert_file() {
+  if (!conf.cert_file_name.empty()) {
+    cert_file.open(conf.cert_file_name.c_str());
+    if (!cert_file.is_open()) {
+      cout << "[unis] Cannot open Counter certification file '"
+           << conf.cert_file_name << "' for writing." << endl;
+      exit(1);
+    }
+  }
+}
+
+/* TODO:
+  Copied directly from approxmc-cert.
+  This may need adjusting, for instance base_rand is adjusted in approxmc-cert
+  based on the current iteration, iter, but here, we don't have that concept.
+*/
 Hash Sampler::add_hash(uint32_t hash_index) {
-  const auto randomBits =
-      gen_rnd_bits(appmc->get_sampling_set().size(), hash_index);
+  string random_bits;
+
+  if (rand_file.is_open()) {
+    // set read position of random bits
+    uint32_t pos_rand = base_rand + hash_index * (conf.full_sampling_vars.size() + 1);
+    rand_file.seekg(pos_rand / 8, ios::beg);
+
+    // read random bits
+    char ch;
+    uint32_t cnt = 0;
+    while (cnt < conf.full_sampling_vars.size() + 1 && rand_file.get(ch)) {
+      for (int i = (cnt ? 7 : 7 - pos_rand % 8);
+           cnt < conf.full_sampling_vars.size() + 1 && i >= 0; i--) {
+        random_bits += '0' + ((ch >> i) & 1);
+        cnt++;
+      }
+    }
+    if (random_bits.size() != conf.full_sampling_vars.size() + 1) {
+      cout << "[unis] Cannot read " << conf.full_sampling_vars.size() + 1
+           << " random bits from file '" << conf.rand_file_name << "'." << endl;
+      exit(1);
+    }
+  } else {
+    random_bits = gen_rnd_bits(conf.full_sampling_vars.size(), hash_index);
+  }
 
   vector<uint32_t> vars;
-  uint32_t i = 0;
-  for (const auto& sampling_var : appmc->get_sampling_set()) {
-    if (randomBits[i] == '1') vars.push_back(sampling_var);
-    i++;
+  for (uint32_t j = 0; j < conf.full_sampling_vars.size(); j++) {
+    if (random_bits[j] == '1') vars.push_back(conf.full_sampling_vars[j]);
   }
 
   solver->new_var();
   const uint32_t act_var = solver->nVars() - 1;
-  const bool rhs = gen_rhs();
-  Hash h(act_var, vars, rhs);
+  bool rhs;
+  if (rand_file.is_open()) {
+    rhs = random_bits.back() == '1';
+  } else {
+    rhs = gen_rhs();
+  }
+  auto h = Hash(act_var, vars, rhs);
 
   vars.push_back(act_var);
   solver->add_xor_clause(vars, rhs);
   if (conf.verb_sampler_cls) print_xor(vars, rhs);
+
   return h;
 }
 
@@ -345,6 +422,9 @@ void Sampler::sample(Config _conf, const ApproxMC::SolCount solCount,
   startTime = cpuTimeTotal();
   randomEngine.seed(appmc->get_seed());
 
+  open_rand_file();
+  open_cert_file();
+
   // Our optimised pivot
   thresh_sampler_gen = 1.0 / (pow(conf.r_thresh_pivot - 1, 2) * conf.epsilon);
 
@@ -377,6 +457,9 @@ void Sampler::sample(Config _conf, const ApproxMC::SolCount solCount,
     startiter = 0; /* Indicate ideal sampling case */
 
   generate_samples(num_samples);
+
+  if (rand_file.is_open()) rand_file.close();
+  if (cert_file.is_open()) cert_file.close();
 }
 
 vector<Lit> Sampler::set_num_hashes(uint32_t num_wanted,
