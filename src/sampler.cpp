@@ -96,6 +96,24 @@ void Sampler::open_cert_file() {
   }
 }
 
+// ---------------------------------------------------------
+// The Dice Roll Function
+// ---------------------------------------------------------
+uint32_t Sampler::dice_roll(BitReader& bits, uint32_t n) {
+  double l = 0.0;
+  double h = static_cast<double>(n);
+
+  while (true) {
+    // Termination condition: Interval is inside a single integer
+    const double floor_l = std::floor(l);
+    const double ceil_end = std::ceil(l + h);
+    if (floor_l == ceil_end - 1.0) return static_cast<uint32_t>(floor_l);
+
+    h /= 2.0;
+    if (bits.next_bit()) l = l + h;
+  }
+}
+
 /* TODO:
   Copied directly from approxmc-cert.
   This may need adjusting, for instance base_rand is adjusted in approxmc-cert

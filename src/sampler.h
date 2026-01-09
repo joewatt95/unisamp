@@ -31,11 +31,14 @@ Sampler
 #include <approxmc/approxmc.h>
 #include <cryptominisat5/cryptominisat.h>
 
+#include <cmath>
 #include <cstdint>
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <optional>
 #include <random>
+#include <stdexcept>
 
 #include "config.h"
 #include "unisamp.h"
@@ -86,6 +89,43 @@ struct SparseData {
   uint32_t next_index = 0;
   double sparseprob = 0.5;
   int table_no = -1;
+};
+
+// For certification
+// ---------------------------------------------------------
+// Helper: Reads bits from an arbitrary input stream
+// ---------------------------------------------------------
+class BitReader {
+ private:
+  std::istream& input_stream;
+  unsigned char current_byte;  // Buffer for the current byte
+  uint32_t bits_remaining;          // How many bits are left in current_byte
+
+ public:
+  // Accept any input stream (cin, ifstream, etc.)
+  explicit BitReader(std::istream& in)
+      : input_stream(in), current_byte(0), bits_remaining(0) {}
+
+  // Returns true (1) or false (0)
+  bool next_bit() {
+    if (bits_remaining == 0) {
+      // Buffer empty, read the next byte (char) from the stream
+      char c;
+      if (!input_stream.get(c)) {
+        throw std::runtime_error("Error: Random bit stream ran out of data!");
+      }
+      current_byte = static_cast<unsigned char>(c);
+      bits_remaining = 8;
+    }
+
+    // Extract the next bit.
+    // We read from Most Significant Bit (MSB) to Least Significant Bit (LSB).
+    // (current_byte >> 7) & 1 gets the MSB.
+    bool bit = (current_byte >> (bits_remaining - 1)) & 1;
+
+    bits_remaining--;
+    return bit;
+  }
 };
 
 class Sampler {
@@ -167,6 +207,7 @@ class Sampler {
   void simplify();
 
   // For certification
+  uint32_t dice_roll(BitReader& bits, uint32_t n);
   void open_rand_file();
   void open_cert_file();
 
