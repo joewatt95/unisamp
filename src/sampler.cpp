@@ -278,6 +278,15 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
     solver->add_clause(lits);
   }
 
+  // Log solutions to certificate file.
+  if (cert_file.is_open()) {
+    cert_file << solutions;
+    for (const auto& solution : *out_solutions) {
+      for (const auto& val : solution) cert_file << val << " ";
+      cert_file << "0" << endl;
+    }
+  }
+
   if (solutions < maxSolutions) {
     // Sampling -- output a random sample of N solutions
     if (solutions >= minSolutions) {
@@ -385,6 +394,15 @@ bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
     if (conf.verb_sampler_cls)
       cout << "c o [unis] Adding banning clause: " << lits << endl;
     solver->add_clause(lits);
+  }
+
+  // Log solutions to certificate file.
+  if (cert_file.is_open()) {
+    cert_file << solutions;
+    for (const auto& solution : *out_solutions) {
+      for (const auto& val : solution) cert_file << val << " ";
+      cert_file << "0" << endl;
+    }
   }
 
   bool ok = false;
