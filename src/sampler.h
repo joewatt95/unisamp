@@ -34,7 +34,6 @@ Sampler
 #include <cstdint>
 #include <fstream>
 #include <map>
-#include <set>
 #include <optional>
 #include <random>
 
@@ -45,7 +44,6 @@ using ApproxMC::SolCount;
 using std::cout;
 using std::endl;
 using std::map;
-using std::set;
 using std::string;
 using std::vector;
 using namespace CMSat;
@@ -158,12 +156,12 @@ class Sampler {
   SolNum bounded_sol_count(uint32_t maxSolutions, const vector<Lit>* assumps,
                            const uint32_t hashCount, uint32_t minSolutions = 1,
                            HashesModels* hm = nullptr,
-                           set<vector<int>>* out_solutions = nullptr);
+                           vector<vector<int>>* out_solutions = nullptr);
   bool bounded_sol_count_unisamp(const vector<Lit>* assumps,
                                  const uint32_t hashCount,
                                  const uint32_t num_tries = 1,
                                  HashesModels* hm = nullptr,
-                                 set<vector<int>>* out_solutions = nullptr);
+                                 vector<vector<int>>* out_solutions = nullptr);
   vector<Lit> set_num_hashes(uint32_t num_wanted, map<uint64_t, Hash>& hashes);
 
   void simplify();
