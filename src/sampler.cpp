@@ -205,7 +205,7 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
                                   const vector<Lit>* assumps,
                                   const uint32_t hashCount,
                                   uint32_t minSolutions, HashesModels* hm,
-                                  vector<vector<int>>* out_solutions) {
+                                  set<vector<int>>* out_solutions) {
   verb_print(1,
              "[unis] "
              "[ " << std::setw(7)
@@ -264,7 +264,7 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
     const vector<lbool> model = solver->get_model();
     check_model(model, hm, hashCount);
     models.push_back(model);
-    if (out_solutions) out_solutions->push_back(get_solution_ints(model));
+    if (out_solutions) out_solutions->insert(get_solution_ints(model));
 
     // ban solution
     vector<Lit> lits;
@@ -323,7 +323,7 @@ bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
                                         const uint32_t hashCount,
                                         const uint32_t num_tries,
                                         HashesModels* hm,
-                                        vector<vector<int>>* out_solutions) {
+                                        set<vector<int>>* out_solutions) {
   verb_print(1,
              "[unis] "
              "[ " << std::setw(7)
@@ -382,7 +382,7 @@ bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
     const vector<lbool> model = solver->get_model();
     check_model(model, hm, hashCount);
     models.push_back(model);
-    if (out_solutions) out_solutions->push_back(get_solution_ints(model));
+    if (out_solutions) out_solutions->insert(get_solution_ints(model));
 
     // ban solution
     vector<Lit> lits;
@@ -545,7 +545,7 @@ void Sampler::generate_samples(uint32_t num_samples_needed) {
       num_samples += gen_n_samples(num_samples_needed);
   } else {
     verb_print(1, "[unis] ideal sampling case");
-    vector<vector<int>> out_solutions;
+    set<vector<int>> out_solutions;
     const uint32_t count =
         bounded_sol_count(
             std::numeric_limits<uint32_t>::max()  // max no. solutions
