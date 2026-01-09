@@ -79,7 +79,7 @@ void Sampler::open_rand_file() {
   if (!conf.rand_file_name.empty()) {
     rand_file.open(conf.rand_file_name.c_str(), ios::binary | ios::in);
     if (!rand_file.is_open()) {
-      cout << "[unis] Cannot open Counter random bits file '"
+      cout << "[unis] Cannot open random bits file '"
            << conf.rand_file_name << "' for reading." << endl;
       exit(1);
     }
@@ -87,11 +87,11 @@ void Sampler::open_rand_file() {
 }
 
 void Sampler::open_cert_file() {
-  if (!conf.cert_file_name.empty()) {
-    cert_file.open(conf.cert_file_name.c_str());
+  if (!conf.unisamp_cert_file_name.empty()) {
+    cert_file.open(conf.unisamp_cert_file_name.c_str());
     if (!cert_file.is_open()) {
-      cout << "[unis] Cannot open Counter certification file '"
-           << conf.cert_file_name << "' for writing." << endl;
+      cout << "[unis] Cannot open certification file '"
+           << conf.unisamp_cert_file_name << "' for writing." << endl;
       exit(1);
     }
   }
@@ -422,7 +422,6 @@ void Sampler::sample(Config _conf, const ApproxMC::SolCount solCount,
   startTime = cpuTimeTotal();
   randomEngine.seed(appmc->get_seed());
 
-  open_rand_file();
   open_cert_file();
 
   // Our optimised pivot

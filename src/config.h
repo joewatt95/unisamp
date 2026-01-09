@@ -40,5 +40,6 @@ struct Config {
 
   // For certification
   std::string rand_file_name = "";
-  std::string cert_file_name = "";
+  std::string approxmc_cert_file_name = "";
+  std::string unisamp_cert_file_name = "";
 };

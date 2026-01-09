@@ -79,7 +79,7 @@ DLL_PUBLIC void UniS::setup_randbits(string rand_file_name)
 
 DLL_PUBLIC void UniS::setup_cert(string cert_file_name)
 {
-    data->conf.cert_file_name = cert_file_name;
+    data->conf.unisamp_cert_file_name = cert_file_name;
 }
 
 DLL_PUBLIC void UniS::sample(const SolCount* sol_count, uint32_t num_samples) {

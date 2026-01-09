@@ -233,10 +233,18 @@ index 72e9777..dd341c7 100644
  
  }
 diff --git a/src/counter.cpp b/src/counter.cpp
-index 2d4e013..b9fd622 100644
+index 2d4e013..afd17a5 100644
 --- a/src/counter.cpp
 +++ b/src/counter.cpp
-@@ -406,12 +406,12 @@ void Counter::set_up_probs_threshold_measurements(
+@@ -325,7 +325,6 @@ ApproxMC::SolCount Counter::solve() {
+         verb_print(1, "[appmc] Formula was UNSAT");
+     if (conf.verb >= 2) solver->print_stats();
+ 
+-    randfile.close();
+     certfile.close();
+ 
+     verb_print(1, "[appmc] ApproxMC T: " << (cpuTimeTotal() - start_time) << " s");
+@@ -406,12 +405,12 @@ void Counter::set_up_probs_threshold_measurements(
      }
  }
  
@@ -251,7 +259,7 @@ index 2d4e013..b9fd622 100644
      orig_num_vars = solver->nVars();
      open_certfile();
      certfile << '0' << endl;
-@@ -800,7 +800,7 @@ string scalmc_version_info()
+@@ -800,7 +799,7 @@ string scalmc_version_info()
  string Counter::get_version_info() const
  {
      string ret = ::scalmc_version_info();

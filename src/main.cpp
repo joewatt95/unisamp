@@ -86,7 +86,8 @@ bool verb_sampler_cls;
 
 // For certification
 string rand_file_name;
-string cert_file_name;
+string approxmc_cert_file_name;
+string unisamp_cert_file_name;
 
 #define myopt(name, var, fun, hhelp)                     \
   program.add_argument(name)                             \
@@ -166,7 +167,9 @@ void add_unisamp_options() {
   // For certification
   myopt("--randbits", rand_file_name, string,
         "Read random bits from this file.");
-  myopt("--cert", cert_file_name, string,
+  myopt("--approxmc-cert", approxmc_cert_file_name, string,
+        "Put certification of Approxmc execution to this file.");
+  myopt("--unisamp-cert", unisamp_cert_file_name, string,
         "Put certification of Unisamp execution to this file.");
 
   program.add_argument("inputfile").remaining().help("input CNF");
@@ -322,9 +325,14 @@ int main(int argc, char** argv) {
     cout << "c [unis] random bits file set " << rand_file_name << endl;
   }
 
-  if (cert_file_name != "") {
-    unisamp->setup_cert(cert_file_name);
-    cout << "c [unis] certification file set " << cert_file_name << endl;
+  if (approxmc_cert_file_name != "") {
+    appmc->set_up_cert(approxmc_cert_file_name);
+    cout << "c [unis] certification file set " << approxmc_cert_file_name << endl;
+  }
+
+  if (unisamp_cert_file_name != "") {
+    unisamp->setup_cert(unisamp_cert_file_name);
+    cout << "c [unis] certification file set " << unisamp_cert_file_name << endl;
   }
 
   const auto& files = program.get<std::vector<std::string>>("inputfile");
