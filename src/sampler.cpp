@@ -298,12 +298,13 @@ SolNum Sampler::bounded_sol_count(uint32_t maxSolutions,
   // Log solutions to certificate file.
   if (cert_file.is_open()) {
     cert_file << solutions;
-    for (const auto& solution : *out_solutions) {
-      for (const auto& val : solution) cert_file << val << " ";
+    for (const auto& model : models) {
+      for (const auto b : model)
+        cert_file << (b == l_True ? 1 : 0) << " ";
       cert_file << "0" << endl;
     }
   }
-
+ 
   if (solutions < maxSolutions) {
     // Sampling -- output a random sample of N solutions
     if (solutions >= minSolutions) {
@@ -416,8 +417,9 @@ bool Sampler::bounded_sol_count_unisamp(const vector<Lit>* assumps,
   // Log solutions to certificate file.
   if (cert_file.is_open()) {
     cert_file << solutions;
-    for (const auto& solution : *out_solutions) {
-      for (const auto& val : solution) cert_file << val << " ";
+    for (const auto& model : models) {
+      for (const auto b : model)
+        cert_file << (b == l_True ? 1 : 0) << " ";
       cert_file << "0" << endl;
     }
   }
